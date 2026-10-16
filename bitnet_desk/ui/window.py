@@ -7,7 +7,7 @@ from pathlib import Path
 from .. import actions
 from .. import config as cfg
 from .. import llm, server
-from ..actions import permissions, pipeline
+from ..actions import misses, permissions, pipeline
 from . import cards
 
 
@@ -41,6 +41,8 @@ def run_app():
             self.chat.tag_config("ok", foreground="#2d6a2d")
             self.chat.tag_config("fail", foreground="#b00020")
             self.links = 0
+            self.last_miss = None          # (what the user typed, what the app did) for /wrong
+            self.last_user_text = ""
 
             self.attach_lbl = tk.Label(root, text="", fg="#555", anchor="w")
             self.attach_lbl.pack(fill="x", padx=10)
@@ -115,6 +117,10 @@ def run_app():
             msg = self.entry.get("1.0", "end").strip()
             if not msg:
                 return
+            if msg.lower() == "/wrong" or msg.lower().startswith("/wrong "):
+                self.entry.delete("1.0", "end")
+                self.report_wrong(msg[len("/wrong"):].strip())
+                return
             if self.pending:                   # a new message skips the open card
                 self.resolve_card(False, "Skipped — nothing was run.")
             if not self.attachment and self.try_action(msg):
@@ -134,6 +140,7 @@ def run_app():
 
         def start_chat(self, msg, user_written=False):
             shown = msg
+            self.last_user_text = msg
             if self.attachment and not user_written:
                 name, text, _ = self.attachment
                 msg = f'Here is the content of the file "{name}":\n"""\n{text}\n"""\n\n{msg}'
@@ -168,7 +175,7 @@ def run_app():
             if outcome.kind == "ask":
                 self.show_card(outcome.proposal)
             else:
-                self.show_result(outcome.proposal.plan, outcome.result)
+                self.show_result(outcome.proposal, outcome.result)
             return True
 
         def route(self, msg):
@@ -186,11 +193,13 @@ def run_app():
             elif outcome.kind == "ask":
                 self.show_card(outcome.proposal)
             elif outcome.kind == "done":
-                self.show_result(outcome.proposal.plan, outcome.result)
+                self.show_result(outcome.proposal, outcome.result)
                 self.status.config(text="Ready")
             else:                              # refused: the user named something that isn't there
                 hint = f" Did you mean: {', '.join(outcome.suggestions)}?" if outcome.suggestions else ""
-                self.write(f"✗ {outcome.message}{hint}\n\n", "fail")
+                self.write(f"✗ {outcome.message}{hint}\n", "fail")
+                self.offer_wrong(msg, misses.describe_refusal(outcome.message))
+                self.write("\n")
                 self.status.config(text="Ready")
 
         def just_chat(self):
@@ -201,17 +210,52 @@ def run_app():
             self.resolve_card(False, "Answered in chat instead — nothing was run.")
             self.start_chat(text, user_written=True)
 
-        def show_result(self, plan, result):
-            if result.ok and plan.answer:
+        def show_result(self, proposal, result):
+            if result.ok and proposal.plan.answer:
                 self.write("Assistant: ", "bot")
-                self.write(result.message + "\n\n")
-                return
-            self.write(cards.outcome_line(result) + "\n", "ok" if result.ok else "fail")
-            if result.items:
-                self.write_items(result.items)
-            elif result.output:
-                self.write(result.output + "\n", "note")
+                self.write(result.message + "\n")
+            else:
+                self.write(cards.outcome_line(result) + "\n", "ok" if result.ok else "fail")
+                if result.items:
+                    self.write_items(result.items)
+                elif result.output:
+                    self.write(result.output + "\n", "note")
+            self.offer_wrong(proposal.text, misses.describe_action(proposal, "auto", result))
             self.write("\n")
+
+        # -- "that was wrong": save real mistakes, later turned into eval cases
+        def offer_wrong(self, text, what):
+            """A small link under a reply/action; a click saves it to the misses file."""
+            self.last_miss = (text, what)
+            self.links += 1
+            tag = f"wrong{self.links}"
+            self.chat.tag_config(tag, foreground="#aaaaaa", font=("Helvetica", 10))
+            saved = []
+
+            def click(event):
+                if saved:
+                    return
+                saved.append(True)
+                misses.record(text, what)
+                self.chat.configure(state="normal")
+                self.chat.insert(f"{tag}.last", " — saved, thanks", "note")
+                self.chat.configure(state="disabled")
+                self.status.config(text="Saved as a miss — `python -m bitnet_desk.actions misses` turns it into an eval case")
+            self.chat.tag_bind(tag, "<Button-1>", click)
+            self.chat.tag_bind(tag, "<Enter>", lambda e: self.chat.config(cursor="pointinghand"))
+            self.chat.tag_bind(tag, "<Leave>", lambda e: self.chat.config(cursor=""))
+            self.write("⚑ that was wrong", tag)
+            self.write("\n")
+
+        def report_wrong(self, note):
+            """/wrong [what you expected] — saves the last exchange as a miss."""
+            if not self.last_miss:
+                self.write("Nothing to report yet — /wrong saves the last reply or action as a miss.\n\n", "note")
+                return
+            text, what = self.last_miss
+            misses.record(text, what, note)
+            self.write(f"Saved “{text}” as a miss" + (f" (you expected: {note})" if note else "")
+                       + ". `python -m bitnet_desk.actions misses` turns it into an eval case.\n\n", "note")
 
         def write_items(self, paths):
             """Clickable paths; a click opens it through the permission gate like any other action."""
@@ -238,7 +282,7 @@ def run_app():
             if permissions.needs_approval(plan):
                 self.show_card(proposal)
             else:
-                self.show_result(plan, permissions.run(proposal))
+                self.show_result(proposal, permissions.run(proposal))
 
         def show_card(self, proposal):
             frame, run_btn, deny_btn, status = cards.build_card(
@@ -264,6 +308,10 @@ def run_app():
                 permissions.deny(proposal)
                 status.config(text=denied_text, fg="#888888")
                 self.status.config(text="Ready" if self.ready else "Starting local model…")
+                self.last_miss = (proposal.text, misses.describe_action(proposal, "denied"))
+                if denied_text.startswith("Denied"):           # an explicit Deny may mean "wrong action"
+                    self.offer_wrong(*self.last_miss)
+                    self.write("\n")
                 return
             status.config(text="Running…", fg="#666666")
 
@@ -273,7 +321,7 @@ def run_app():
                                              progress=lambda text: self.q.put(("progress", (status, text))))
                 except Exception as e:
                     result = actions.Result(False, f"Couldn't run it: {e}")
-                self.q.put(("action", (status, result)))
+                self.q.put(("action", (status, proposal, result)))
             threading.Thread(target=work, daemon=True).start()
 
         def on_approve_key(self, event):
@@ -360,7 +408,8 @@ def run_app():
                         except tk.TclError:
                             pass
                     elif kind == "action":
-                        status, result = val
+                        status, proposal, result = val
+                        self.last_miss = (proposal.text, misses.describe_action(proposal, "approved", result))
                         text = cards.outcome_line(result) + (f"\n{result.output}" if result.output else "")
                         if result.items:
                             self.write_items(result.items)
@@ -369,6 +418,8 @@ def run_app():
                             status.config(text=text, fg="#2d6a2d" if result.ok else "#b00020")
                         except tk.TclError:        # card was cleared meanwhile; the log has it
                             pass
+                        self.offer_wrong(*self.last_miss)
+                        self.write("\n")
                         self.status.config(text="Ready" if self.ready else "Starting local model…")
             except queue.Empty:
                 pass
@@ -388,6 +439,11 @@ def run_app():
                     self.write(" [stopped]", "note")
                 tps = (val or {}).get("predicted_per_second")
                 self.status.config(text=f"Ready · {tps:.1f} tokens/s" if tps else "Ready")
+                if reply:
+                    self.write("\n")
+                    self.offer_wrong(self.last_user_text, misses.describe_chat(reply))
+                    self.write("\n")
+                    return
             self.write("\n\n")
 
     root = tk.Tk()

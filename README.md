@@ -79,6 +79,16 @@ command, and nothing runs until you click **Run** (or press ⌘↩). **Deny** (o
 something that runs code, like a `.command` script, always asks. Network and shell actions will
 always ask, whatever the settings say.
 
+**"That was wrong."** Under every reply and action there's a small *⚑ that was wrong* link. Click it,
+or type `/wrong` (optionally followed by what you expected, e.g. `/wrong I meant Spotify`), and the
+app saves your message and what it did to `misses.jsonl` in the same folder as the settings file,
+readable only by you. Later, run
+```bash
+python3.12 -m bitnet_desk.actions misses          # or: misses --list
+```
+It shows each miss and asks what the right answer was. Each one becomes a test case in
+`evals/actions.jsonl`, so the app's eval grows from how you actually use it.
+
 **Action log.** Every action, including ones you denied, is written to
 `~/Library/Application Support/BitNetDesk/actions.jsonl` (only you can read it). To see the latest
 entries:

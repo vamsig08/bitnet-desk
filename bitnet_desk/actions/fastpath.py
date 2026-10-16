@@ -17,7 +17,7 @@ POLITE_START = re.compile(
 POLITE_END = re.compile(r"(?:[\s,]+(?:please|for me|thanks|thank you|thx|if you can|if you could))+$", _I)
 
 # Questions about the current date/time. Answered from the clock, never by the model.
-_WHEN = r"(?:\s+(?:today|now|right now|currently|at the moment|here))*"
+_WHEN = r"(?:\s+(?:today|now|right now|currently|at the moment|here|in here|over here))*"
 _WHAT = (r"time|date|day|year|month|day of the week|weekday|date and time|time and date|"
          r"day and date|date and day")
 _DAYS = r"monday|tuesday|wednesday|thursday|friday|saturday|sunday|the weekend|a weekday"

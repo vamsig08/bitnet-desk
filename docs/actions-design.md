@@ -41,6 +41,9 @@ Driven by the try-out and the first eval runs (`docs/evals.md`):
 - A `help` command lists what the app can do (from the registry), and the chat system prompt lists
   the same commands and forbids claiming actions it didn't take.
 - Model-path cards have a **Just chat** button.
+- **Misses feed the eval:** "⚑ that was wrong" / `/wrong` save real mistakes to `misses.jsonl`;
+  `python -m bitnet_desk.actions misses` turns them into cases (`note: "from real use …"`). A miss
+  the fast path gets wrong becomes a failing pytest until a rule is fixed — that's intended.
 
 ---
 

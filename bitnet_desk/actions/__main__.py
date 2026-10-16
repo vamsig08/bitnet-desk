@@ -1,5 +1,6 @@
 """python -m bitnet_desk.actions log [-n N]   — show the action log
-python -m bitnet_desk.actions eval [--write]  — run the action eval (fast path + real model)"""
+python -m bitnet_desk.actions eval [--write]  — run the action eval (fast path + real model)
+python -m bitnet_desk.actions misses [--list] — turn "that was wrong" reports into eval cases"""
 import argparse
 import importlib
 import os
@@ -69,6 +70,8 @@ def main(argv=None):
     p_log.add_argument("-n", type=int, default=30, help="how many entries (default 30)")
     p_eval = sub.add_parser("eval", help="run the action eval against the real model")
     p_eval.add_argument("--write", action="store_true", help="add the results to docs/evals.md")
+    p_miss = sub.add_parser("misses", help='turn "that was wrong" reports into eval cases')
+    p_miss.add_argument("--list", action="store_true", help="just list them")
     a = ap.parse_args(argv)
     if a.cmd == "log":
         entries = log.read(a.n)
@@ -78,6 +81,17 @@ def main(argv=None):
             print(log.format_entry(e))
     elif a.cmd == "eval":
         run_eval(a.write)
+    elif a.cmd == "misses":
+        from . import misses
+        if a.list:
+            entries = misses.read()
+            if not entries:
+                print(f"No misses saved yet ({cfg.MISSES}).")
+            for e in entries:
+                state = {False: "new", "dropped": "dropped"}.get(e.get("converted"), f"case #{e.get('converted')}")
+                print(f"{e['ts'][:16].replace('T', ' ')}  {state:9}  {e['text']!r} — {misses.did_line(e['did'])}")
+        else:
+            misses.convert()
 
 
 if __name__ == "__main__":

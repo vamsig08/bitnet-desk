@@ -182,6 +182,7 @@ _ACTIONS = _FILE.get("actions", {})
 AUTO_APPROVE = tuple(_ACTIONS.get("auto_approve", DEFAULT_AUTO_APPROVE))
 ACTION_LOG_ENABLED = _ACTIONS.get("log", True)
 ACTION_LOG = Path(os.environ.get("BITNET_ACTION_LOG") or CONFIG_PATH.parent / "actions.jsonl")
+MISSES = Path(os.environ.get("BITNET_MISSES") or CONFIG_PATH.parent / "misses.jsonl")   # "that was wrong"
 APP_ALIASES = _FILE.get("aliases", {}).get("apps", {})
 EDITOR = _ACTIONS.get("editor", "Visual Studio Code")
 TERMINAL = _ACTIONS.get("terminal", "Terminal")

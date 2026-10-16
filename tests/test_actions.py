@@ -208,7 +208,8 @@ def test_polite_wrappers_dont_make_commands(fake_mac, text):
                                   "what day is it", "time", "what time is it today", "whats todays date",
                                   "what day of the week is it", "what year is it", "tell me the time",
                                   "do you know what time it is?", "what's the current date and time",
-                                  "is it friday yet?", "can you tell me what time it is please"])
+                                  "is it friday yet?", "can you tell me what time it is please",
+                                  "what time is it in here"])
 def test_fast_path_time(fake_mac, text):
     assert fastpath.match(text).tool == "now"
 

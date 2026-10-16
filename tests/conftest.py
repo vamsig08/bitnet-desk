@@ -42,6 +42,7 @@ def isolated_settings(tmp_path, monkeypatch, reload_config):
         monkeypatch.delenv(env, raising=False)
     monkeypatch.setenv("BITNET_PORT", str(free_port()))   # nothing listens here
     monkeypatch.setenv("BITNET_ACTION_LOG", str(tmp_path / "actions.jsonl"))
+    monkeypatch.setenv("BITNET_MISSES", str(tmp_path / "misses.jsonl"))
     monkeypatch.setenv("BITNET_APP_DIRS", str(tmp_path / "no-apps"))   # never scan the real /Applications
     reload_config()
     yield
