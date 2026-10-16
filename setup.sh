@@ -3,9 +3,22 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+# Apple clang 17 (Xcode 26) hangs or miscompiles bitnet.cpp's kernels; it needs clang >= 18.
+# setup_env.py calls plain `clang`, so put Homebrew LLVM first on PATH when it's installed.
+if [ "$(uname -s)" = "Darwin" ] && command -v brew >/dev/null 2>&1 \
+   && [ -x "$(brew --prefix llvm)/bin/clang" ]; then
+  export PATH="$(brew --prefix llvm)/bin:$PATH"
+fi
+
 for c in git cmake clang; do
   command -v "$c" >/dev/null 2>&1 || { echo "Missing: $c (see README → Prerequisites)"; exit 1; }
 done
+CLANG_MAJOR=$(clang -dM -E -x c /dev/null | awk '/__clang_major__/ {print $3}')
+if [ "$CLANG_MAJOR" -lt 18 ]; then
+  echo "bitnet.cpp needs clang >= 18; $(command -v clang) is $CLANG_MAJOR. On macOS: brew install llvm"
+  exit 1
+fi
+echo "Using clang $CLANG_MAJOR at $(command -v clang)"
 
 # BitNet's requirements pin torch 2.2, which supports Python 3.9–3.12 only.
 # Pick a compatible interpreter (override with PYTHON=/path/to/python).
@@ -21,17 +34,34 @@ fi
   || { echo "$PYTHON is not Python 3.9–3.12. Set PYTHON=… to a compatible one."; exit 1; }
 echo "Using $("$PYTHON" --version) at $(command -v "$PYTHON")"
 
+# Pin upstream: on 2026-07-15 BitNet HEAD switched llama.cpp to a new fork that builds broken on
+# macOS (split ggml libs fail to link) and produces garbage with the 2B4T i2_s model.
+# 1876a3e (2026-01-27) is the last commit before that.
+BITNET_REF="${BITNET_REF:-1876a3e8895f5f88f976760fdbc588c1eafa2d48}"
 if [ ! -d BitNet ]; then
-  git clone --recursive https://github.com/microsoft/BitNet.git
+  git clone https://github.com/microsoft/BitNet.git
 fi
 cd BitNet
+if [ "$(git rev-parse HEAD)" != "$(git rev-parse "$BITNET_REF^{commit}" 2>/dev/null)" ]; then
+  git fetch origin
+  # --force discards include/ files that setup_env.py's codegen regenerates anyway.
+  git checkout --force --detach "$BITNET_REF"
+fi
+git submodule sync --recursive
+git submodule update --init --recursive --force
+# A build/ from a different commit, compiler or config has a stale CMake cache; start clean.
+BUILD_ID="$BITNET_REF clang$CLANG_MAJOR $(cksum < ../cmake/bitnet-build.cmake | cut -d" " -f1)"
+if [ -d build ] && [ "$(cat build/.bitnet-ref 2>/dev/null)" != "$BUILD_ID" ]; then
+  rm -rf build
+fi
 
 "$PYTHON" -m venv .venv
 # shellcheck disable=SC1091
 source .venv/bin/activate
 pip install --upgrade pip
 pip install -r requirements.txt
-pip install -U "huggingface_hub[cli]"
+# Keep huggingface_hub < 1.0: BitNet's pinned transformers/tokenizers reject 1.x/2.x.
+pip install "huggingface_hub[cli]>=0.34,<1.0"
 
 MODEL_DIR=models/BitNet-b1.58-2B-4T
 if [ ! -f "$MODEL_DIR/ggml-model-i2_s.gguf" ]; then
@@ -44,7 +74,10 @@ if [ ! -f "$MODEL_DIR/ggml-model-i2_s.gguf" ]; then
 fi
 
 echo "Building bitnet.cpp with the i2_s ternary kernel…"
-python setup_env.py -md "$MODEL_DIR" -q i2_s
+# setup_env.py runs CMake itself; pass our settings (CPU only, macOS SDK flags) via a toolchain file.
+CMAKE_TOOLCHAIN_FILE="$(cd .. && pwd)/cmake/bitnet-build.cmake" python setup_env.py -md "$MODEL_DIR" -q i2_s
+
+echo "$BUILD_ID" > build/.bitnet-ref
 
 if [ ! -x build/bin/llama-server ]; then
   echo "Building llama-server target…"
@@ -53,3 +86,8 @@ fi
 
 echo
 echo "Done. Start the assistant with:  $PYTHON assistant.py"
+if [ "$(uname -s)" = "Darwin" ] && [ "$(uname -m)" = "arm64" ]; then
+  echo
+  echo "WARNING: on Apple Silicon this bitnet.cpp build gives garbage output with the HF i2_s model"
+  echo "(ARM kernels expect a different i2_s block layout). See docs/setup-notes.md."
+fi

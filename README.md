@@ -56,6 +56,7 @@ First launch takes a few seconds while the model loads. You can now disconnect f
 | `BITNET_SYSTEM` | built-in | your own system prompt |
 | `BITNET_PORT` | 8080 | local server port |
 | `BITNET_DIR` / `BITNET_MODEL` | `./BitNet/…` | custom install or model path |
+| `BITNET_SERVER` | bitnet.cpp's `llama-server` | another `llama-server` binary, e.g. Homebrew llama.cpp's for a TQ2_0 model |
 
 Example: `BITNET_THREADS=8 BITNET_SYSTEM="You are my terse coding buddy." python3 assistant.py`
 
@@ -73,6 +74,8 @@ large cloud models on niche facts, long multi-step reasoning, and non-trivial co
 factual answers as a starting point.
 
 ## Troubleshooting
+- **Apple Silicon (M1/M2/M3/M4): replies are garbage or rambling** — known issue as of Oct 2026;
+  neither backend gives good answers yet. Details and options: `docs/setup-notes.md`.
 - **"llama-server not found"** — setup didn't finish; re-run it and check the build output.
 - **"Model server exited"** — read `server.log`. Port in use? Try `BITNET_PORT=8090`.
 - **Garbled / run-on replies** — make sure you used the `i2_s` GGUF from

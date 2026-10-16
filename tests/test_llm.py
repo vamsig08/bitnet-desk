@@ -85,3 +85,34 @@ def test_history_trimming_keeps_latest_and_fits():
     assert len(a.build_prompt("sys", fitted)) <= a.MAX_PROMPT_CHARS
     huge = a.fit_history("sys", [("user", "z" * 50000)])
     assert len(a.build_prompt("sys", huge)) <= a.MAX_PROMPT_CHARS
+
+
+def _fake_server(tmp_path, help_text):
+    exe = tmp_path / "llama-server"
+    exe.write_text(f"#!/bin/sh\ncat <<'EOF'\n{help_text}\nEOF\n")
+    exe.chmod(0o755)
+    return exe
+
+
+def test_bitnet_server_env_selects_binary(tmp_path, monkeypatch):
+    exe = _fake_server(tmp_path, "usage")
+    monkeypatch.setenv("BITNET_SERVER", str(exe))
+    a = load_app(_free_port())
+    assert a.find_server_bin() == exe
+
+
+def test_missing_bitnet_server_is_reported(tmp_path, monkeypatch):
+    monkeypatch.setenv("BITNET_SERVER", str(tmp_path / "nope"))
+    a = load_app(_free_port())
+    assert a.find_server_bin() is None
+
+
+def test_server_cmd_is_cpu_only_and_local(tmp_path, monkeypatch):
+    monkeypatch.setenv("BITNET_MODEL", "/m.gguf")
+    a = load_app(_free_port())
+    new = a.server_cmd(_fake_server(tmp_path, "-dev,  --device <dev1,..>   (none = don't offload)"))
+    assert new[new.index("-ngl") + 1] == "0" and new[new.index("--host") + 1] == "127.0.0.1"
+    assert new[new.index("-m") + 1] == "/m.gguf"
+    assert new[-2:] == ["--device", "none"]
+    old = a.server_cmd(_fake_server(tmp_path, "-ngl N  number of layers"))   # bitnet.cpp's server
+    assert "--device" not in old and old[old.index("-ngl") + 1] == "0"

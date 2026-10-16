@@ -55,8 +55,10 @@ above without changing behaviour.
 
 ## macOS setup gotchas
 - Tools: `xcode-select --install`, `brew install cmake python@3.12 python-tk@3.12`. Use Python 3.12 (BitNet pins torch 2.2 → Python ≤ 3.12). This Mac also has an old python.org Python 3.7 in /usr/local/bin — never use it; run the app with `python3.12`.
-- `bitnet.cpp` wants clang ≥ 18. If Apple's clang fails the build: `brew install llvm` and run setup
-  with `CC=$(brew --prefix llvm)/bin/clang CXX=$(brew --prefix llvm)/bin/clang++`.
+- `bitnet.cpp` wants clang ≥ 18 (Apple clang 17 hangs/miscompiles). `setup.sh` uses Homebrew LLVM
+  automatically if installed (`brew install llvm`); `CC=`/`CXX=` don't work because `setup_env.py`
+  hardcodes `clang`. Extra CMake settings live in `cmake/bitnet-build.cmake`.
+- Apple Silicon status, pinned BitNet commit and known model-output problems: `docs/setup-notes.md`.
 - Tkinter from Homebrew Python needs the matching `python-tk@3.x` formula.
 - If `setup_env.py` fails, read its log under `BitNet/logs/` before changing anything.
 
@@ -64,7 +66,8 @@ above without changing behaviour.
 ```bash
 ./setup.sh                      # one-time: clone, download model, build (needs internet)
 python3.12 assistant.py         # run v0 (after phase 1: python3 -m bitnet_desk)
-python3 -m pytest -q            # tests (mock server; no model needed)
+python3.12 -m venv .venv && .venv/bin/pip install pytest   # one-time test setup
+.venv/bin/python -m pytest -q   # tests (mock server; no model needed)
 BITNET_THREADS=8 python3 assistant.py
 ```
 

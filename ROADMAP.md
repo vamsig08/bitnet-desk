@@ -9,8 +9,10 @@ Each phase ends with something usable. Tick boxes as items land; keep the log at
 
 ## Phase 0 — Get v0 running on the Mac
 - [ ] `./setup.sh` completes on Apple Silicon (fix script issues found along the way)
+  - 2026-10-15: completes on M1 after fixes, but bitnet.cpp output is garbage on ARM with the HF i2_s GGUF (`QK_I2_S` layout mismatch) — see `docs/setup-notes.md`
 - [ ] `python3 assistant.py` opens, loads the model, answers a question
-- [ ] Record baseline: Mac model, chip, RAM, threads, tokens/s, load time, RAM use → `docs/benchmarks.md`
+  - 2026-10-15: opens and loads (plan B: Homebrew llama.cpp + TQ2_0 via `BITNET_SERVER`), but answers are incoherent
+- [x] Record baseline: Mac model, chip, RAM, threads, tokens/s, load time, RAM use → `docs/benchmarks.md` (speed/RAM only; re-run once output is coherent)
 
 **Done when:** you can chat with the model offline (Wi-Fi off).
 
@@ -72,3 +74,4 @@ Each phase ends with something usable. Tick boxes as items land; keep the log at
 
 ## Log
 - 2026-10-14: v0 created — single-file Tkinter app, setup scripts, README, CLAUDE.md, roadmap.
+- 2026-10-15: Phase 0 on M1: setup.sh pins BitNet `1876a3e`, uses Homebrew clang, CPU-only CMake settings; `BITNET_SERVER` + auto `--device none` in assistant.py; baseline benchmarks. Model output still broken on Apple Silicon for both backends — findings in `docs/setup-notes.md`.

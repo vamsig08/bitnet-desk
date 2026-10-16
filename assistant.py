@@ -8,6 +8,7 @@ llama-server, bound to 127.0.0.1. Nothing leaves your machine. Standard library 
 import json
 import os
 import queue
+import shutil
 import subprocess
 import threading
 import time
@@ -21,6 +22,8 @@ BITNET_DIR = Path(os.environ.get("BITNET_DIR", HERE / "BitNet"))
 MODEL = Path(os.environ.get(
     "BITNET_MODEL",
     BITNET_DIR / "models" / "BitNet-b1.58-2B-4T" / "ggml-model-i2_s.gguf"))
+# Any llama-server binary, e.g. mainline llama.cpp's for a TQ2_0 model. Default: the bitnet.cpp build.
+SERVER_BIN = os.environ.get("BITNET_SERVER")
 HOST = "127.0.0.1"                      # never 0.0.0.0 — keeps the model local-only
 PORT = int(os.environ.get("BITNET_PORT", "8080"))
 BASE = f"http://{HOST}:{PORT}"
@@ -68,6 +71,9 @@ def server_up():
 
 
 def find_server_bin():
+    if SERVER_BIN:
+        found = shutil.which(SERVER_BIN)
+        return Path(found) if found else None
     for p in (BITNET_DIR / "build/bin/llama-server",
               BITNET_DIR / "build/bin/Release/llama-server.exe",
               BITNET_DIR / "build/bin/llama-server.exe"):
@@ -76,15 +82,32 @@ def find_server_bin():
     return None
 
 
+def supports_device_none(exe):
+    """Newer llama-server can offload big batches to the GPU even with -ngl 0; `--device none` stops it."""
+    try:
+        out = subprocess.run([str(exe), "--help"], capture_output=True, text=True, timeout=20)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return any("--device" in line and "none" in line for line in (out.stdout + out.stderr).splitlines())
+
+
+def server_cmd(exe):
+    cmd = [str(exe), "-m", str(MODEL), "-c", str(CTX), "-t", str(THREADS),
+           "-ngl", "0", "--host", HOST, "--port", str(PORT)]
+    if supports_device_none(exe):
+        cmd += ["--device", "none"]
+    return cmd
+
+
 def start_server(log_path):
     exe = find_server_bin()
     if exe is None:
-        raise RuntimeError(f"llama-server not found under {BITNET_DIR}/build/bin — run setup first.")
+        where = SERVER_BIN if SERVER_BIN else f"under {BITNET_DIR}/build/bin"
+        raise RuntimeError(f"llama-server not found {where} — run setup first.")
     if not MODEL.exists():
         raise RuntimeError(f"Model not found: {MODEL} — run setup first.")
     log = open(log_path, "w")
-    cmd = [str(exe), "-m", str(MODEL), "-c", str(CTX), "-t", str(THREADS),
-           "-ngl", "0", "--host", HOST, "--port", str(PORT)]
+    cmd = server_cmd(exe)
     kwargs = {}
     if os.name == "nt":
         kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW

@@ -12,3 +12,6 @@ __pycache__/
 server.log
 *.sqlite
 .DS_Store
+
+# downloaded model files (e.g. TQ2_0 GGUF for mainline llama.cpp)
+models/
