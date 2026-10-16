@@ -1,7 +1,10 @@
 # BitNet Desk — Roadmap
 
-Vision: a private assistant on your MacBook that runs a 1-bit LLM on the CPU, knows your files,
-takes safe actions with your approval, and is always a hotkey away. Nothing leaves the machine.
+Vision: a Jarvis-style assistant that controls your Mac, running a 1-bit LLM on the CPU. The model
+never sends your data anywhere; the only network traffic is an action you asked for and approved.
+
+Strategy: be exceptionally good at a small number of useful local tasks first, all behind one
+consistent permission system, then add capabilities over time. UI polish and saved conversations wait.
 
 Each phase ends with something usable. Tick boxes as items land; keep the log at the bottom.
 
@@ -14,19 +17,38 @@ Each phase ends with something usable. Tick boxes as items land; keep the log at
 
 **Done when:** you can chat with the model offline (Wi-Fi off). — everything above works; the Wi-Fi-off check is still to do by hand.
 
-## Phase 1 — Solid foundation
+## Phase 1 — Solid foundation (done; remaining polish moved to Phase 6)
 - [x] Split `assistant.py` into the `bitnet_desk/` package (config, server, llm, ui, app) with no behaviour change
 - [x] Current local date and weekday in the system prompt, local time on the newest message only — computed on every request, never stored in history
 - [x] `tests/conftest.py` mock llama-server fixture; tests for prompt format, streaming, stop, context fitting
 - [x] Real token counting via `/tokenize` instead of the chars/3 estimate
 - [x] Config file at `~/Library/Application Support/BitNetDesk/config.toml` (threads, ctx, temp, system prompt)
-- [ ] Better UI: Markdown-ish rendering (code blocks, bold), copy button on replies, dark mode
-- [ ] Persistent conversations (local SQLite) with a sidebar to reopen them
-- [ ] Benchmark script: `python -m bitnet_desk.bench` → tokens/s, first-token latency, peak RAM
 
-**Done when:** it's a pleasant daily chat app with tests passing and saved history.
+## Phase 2 — Actions (next) — design: `docs/actions-design.md`
+- [ ] Action core: tool registry with risk levels (read-only / changes / network / shell), frozen `Plan` objects, permission gate
+- [ ] Approval card in the chat window showing the exact command; nothing non-read-only runs without a click
+- [ ] Action log (local JSONL) + a window to review it
+- [ ] Tools: current date/time, find files (`mdfind`), open app, open file/folder, open URL, start project (`[projects]` in config.toml), download to ~/Downloads, run shell command
+- [ ] Fast path: rule-based matching for common commands, no model call
+- [ ] Model path: model picks one tool + JSON args under the server's `json_schema` grammar; confidence from token probabilities; grounding checks on arguments
+- [ ] Failure handling: unsure / no tool / bad arguments / server down (see design)
+- [ ] Action eval (~40 commands): fast path scored in pytest, model path by `python -m bitnet_desk.actions.eval` → `docs/evals.md`
 
-## Phase 2 — It knows your stuff (local RAG)
+**Done when:** "open Safari", "start project bitnet-desk", "download https://…", "find my resume" and
+"what time is it" all work from one chat box; non-read-only actions wait for one approval click; the
+action log shows everything; eval numbers are recorded.
+
+## Phase 3 — More actions (grow one tool at a time, each with eval cases)
+- [ ] Notes and files: create note, append to file, move file to folder (show a preview/diff)
+- [ ] Open & summarise a file (model reads supplied text — its strength)
+- [ ] Mac control: volume, dark mode, do-not-disturb, quit app, list running apps
+- [ ] Clipboard: "summarise / rewrite what I copied"
+- [ ] Reminders / Calendar via AppleScript (read-only first, then create with approval)
+- [ ] Two-step actions (e.g. find a file, then open it) — only after single actions are reliable
+
+**Done when:** a typical day's small Mac chores can be done from the chat box.
+
+## Phase 4 — It knows your stuff (local RAG)
 - [ ] Choose a CPU embedding model (small, ARM-friendly, runs offline) and record why in `docs/decisions.md`
 - [ ] Indexer: user picks folders → chunk .md/.txt/.pdf/code → embed → SQLite (vectors + text + source path)
 - [ ] Incremental re-index on file changes (mtime-based; no background daemon needed at first)
@@ -36,26 +58,21 @@ Each phase ends with something usable. Tick boxes as items land; keep the log at
 
 **Done when:** "What did I write about X?" gets a correct answer with clickable sources.
 
-## Phase 3 — It can do things (tools, with approval)
-- [ ] Tool registry: name, description, JSON args schema, `read_only` flag
-- [ ] Simple tool-calling protocol the 2B model can follow reliably (constrained JSON / grammar if supported by the server)
-- [ ] Read-only tools: search files, open & summarise a file, list recent files, current date/time, calculator
-- [ ] Write tools (always confirm, show a diff/preview): create note, append to file, move file to folder
-- [ ] Action log the user can review
-- [ ] Eval: tool-selection accuracy on a fixed set of prompts
-
-**Done when:** "Find my notes on X and draft a summary into summary.md" works, with one approval click.
-
-## Phase 4 — Always there
+## Phase 5 — Always there
 - [ ] Global hotkey (e.g. ⌥Space) to show/hide a compact window
 - [ ] Menu-bar icon; launch at login (optional)
 - [ ] Voice in: `whisper.cpp` (small/base model, CPU) push-to-talk
 - [ ] Voice out: `piper` TTS, toggleable
 - [ ] "Ask about selection": send selected text from any app (clipboard-based)
 
-**Done when:** you can press a hotkey, speak a question, and hear the answer — offline.
+**Done when:** you can press a hotkey, speak a command, and have it done — offline.
 
-## Phase 5 — Shareable app
+## Phase 6 — Polish
+- [ ] Better UI: Markdown-ish rendering (code blocks, bold), copy button on replies, dark mode
+- [ ] Persistent conversations (local SQLite) with a sidebar to reopen them
+- [ ] Benchmark script: `python -m bitnet_desk.bench` → tokens/s, first-token latency, peak RAM
+
+## Phase 7 — Shareable app
 - [ ] macOS `.app` bundle (py2app or similar) with the built server + model download on first run
 - [ ] First-run wizard: checks CPU/RAM, downloads model, picks folders to index
 - [ ] Signed/notarised build or clear instructions for Gatekeeper
@@ -67,7 +84,7 @@ Each phase ends with something usable. Tick boxes as items land; keep the log at
 ---
 
 ## Stretch ideas
-- Swap in larger/newer 1-bit models as they're released; compare in `docs/benchmarks.md`
+- Swap in larger/newer 1-bit models as they're released; compare in `docs/benchmarks.md` and the action eval
 - Speculative decoding or prompt caching tweaks for faster first token
 - LoRA-style personalisation is out of scope for ternary weights for now — revisit if tooling appears
 
@@ -81,3 +98,4 @@ Each phase ends with something usable. Tick boxes as items land; keep the log at
 - 2026-10-16: `config.toml` support (threads, ctx, max_tokens, temperature, system_prompt) via stdlib `tomllib`; env vars override it; bad lines are skipped and shown in the chat window.
 - 2026-10-16: Time moved from the system prompt to the newest user message (prompt only, not saved history); system prompt keeps date + weekday. Old turns stay byte-identical, so a follow-up a minute later re-evaluates 44 tokens (0.5 s) instead of ~2k (20 s) on M1.
 - 2026-10-16: Mock llama-server (/health, /tokenize, streaming /completion) and settings isolation moved to `tests/conftest.py`; tests split into test_llm/test_server/test_config; added a Stop-mid-stream test.
+- 2026-10-16: Priorities changed: Actions (one permission system, fast path + model router) is now Phase 2, ahead of RAG and UI polish; privacy rule reworded to "model never sends data; only approved actions use the network". Design in `docs/actions-design.md`. Checked pinned server: `json_schema`, `grammar` and `n_probs` all work on `/completion`.

@@ -7,15 +7,24 @@ through the official `bitnet.cpp` runtime. The goal is to grow it from a local c
 assistant that knows the user's files, can take safe actions, and is always one hotkey away.
 `ROADMAP.md` has the phases and the current status.
 
+## Guiding principle
+The long-term goal is a Jarvis-style assistant that controls the Mac. The strategy: **be exceptionally
+good at a small number of useful local tasks first**, all behind one consistent permission system,
+then add capabilities over time. A new tool lands only when it's reliable (covered by the action eval)
+and goes through the same permission gate as every other tool. Prefer depth over breadth: fewer
+actions that work every time beat many that work sometimes. UI polish and saved conversations wait.
+
 ## Non-negotiable rules
-1. **Nothing leaves the machine at runtime.** The only network traffic allowed while the app runs is
-   to `127.0.0.1`. Servers bind to `127.0.0.1`, never `0.0.0.0`. No telemetry, no update checks, no
-   cloud APIs, no "optional" online fallbacks. Network is allowed only in setup scripts (clone, model
-   download, pip install).
+1. **The model never sends the user's data anywhere.** The only network traffic allowed at runtime is
+   an action the user explicitly asked for and approved (e.g. a download, opening a URL). No telemetry,
+   no update checks, no cloud APIs, no "optional" online fallbacks, and no background network calls
+   of any kind. The llama-server binds to `127.0.0.1`, never `0.0.0.0`. Setup scripts may use the
+   network (clone, model download, pip install).
 2. **No GPU, ever.** Everything must run acceptably on a CPU-only MacBook. Pass `-ngl 0` to llama-server.
-3. **Side effects need confirmation.** Any tool that writes, moves or deletes files, runs commands, or
-   touches other apps must show the user exactly what it will do and wait for approval. Read-only
-   tools can run without asking.
+3. **One permission system for every action.** Each tool declares a risk level: read-only, changes
+   things, network, or shell. Read-only tools run immediately; everything else shows the user the
+   exact command/effect and waits for approval. Every action (approved, denied or automatic) goes
+   in the local action log. No tool bypasses this, and the model can't lower a risk level.
 4. **Dependencies are a cost.** Prefer the standard library. Add a package only when it clearly earns
    its place, it is pure-Python or has macOS arm64 wheels, it doesn't phone home, and it is pinned in
    `requirements.txt` with a one-line reason in the PR/commit.
@@ -31,9 +40,10 @@ bitnet_desk/
   config.py      env vars + ~/Library/Application Support/BitNetDesk/config.toml
   server.py      start/stop/health of bitnet.cpp llama-server (subprocess, localhost only)
   llm.py         prompt formatting, streaming /completion client, context fitting
-  memory/        (phase 2) local index of user folders: chunking, CPU embeddings, SQLite store
-  tools/         (phase 3) tool registry; each tool declares read_only: bool
-  ui/            Tkinter app (may move to a native wrapper in phase 5)
+  actions/       (phase 2) tool registry, fast path, model router, permissions, action log, eval
+                 — design in docs/actions-design.md
+  memory/        (phase 4) local index of user folders: chunking, CPU embeddings, SQLite store
+  ui/            Tkinter app (may move to a native wrapper in phase 7)
   app.py         entry point: python -m bitnet_desk
 tests/           pytest; uses a mock llama-server, never the real model
 BitNet/          upstream microsoft/BitNet clone + model weights (git-ignored, built by setup.sh)
