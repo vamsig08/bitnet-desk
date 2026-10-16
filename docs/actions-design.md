@@ -23,6 +23,25 @@ Goal: one chat box where "open Safari", "start project bitnet-desk", "download h
 approval click, and everything lands in an action log. Few tools, done very well, behind one
 permission system.
 
+### Changes made while building (2026-10-16)
+Driven by the try-out and the first eval runs (`docs/evals.md`):
+- **Below the threshold → chat, not an "are you sure?" card.** All 9 picks under 0.7 were wrong in
+  the first run, so asking would only have added clicks.
+- **The grammar is built per message.** URLs (`download`, `open_url`), shell commands and paths
+  may only be *copied* from the message (`enum`); if there is nothing to copy, the tool isn't
+  offered. A plain `pattern` made the model mangle URLs (`report.4pdf`); copying fixed downloads
+  completely. The prompt stays fixed, so the prompt cache still works.
+- **Grounding has three outcomes:** literal (value in the message) → normal gate; inferred
+  ("play some music" → Spotify, a file search that doesn't mention files) → always asks, even if
+  the tool is auto-approved; invented → chat. A named target that doesn't exist (an unknown
+  project) gets a refusal with suggestions instead.
+- `now` from the model refuses questions about other places/time zones; its answer says "local time".
+- `/Users/username/…` placeholders from the model map to the real home folder (still must exist).
+- Configured project names are listed in the router prompt; without projects the tool isn't offered.
+- A `help` command lists what the app can do (from the registry), and the chat system prompt lists
+  the same commands and forbids claiming actions it didn't take.
+- Model-path cards have a **Just chat** button.
+
 ---
 
 ## 1. What the pinned server supports (checked, not assumed)
@@ -237,7 +256,7 @@ Examples: (6–8 short few-shot lines, including two "chat" ones)
 
 **Confidence.** Take `completion_probabilities` at the tool-name token, keep only the candidates that
 are valid first tokens of tool names, renormalise → `p_tool`. (Needed because the server reports
-pre-grammar probabilities.)
+pre-grammar probabilities.) Built: `router.tool_confidence`; below `THRESHOLD` (0.7) → chat.
 
 **Grounding checks** (Python, after the call, before planning) — this is where invented values die:
 - `open_url` / `download`: the URL's host must appear in the user's text (a bare word "wikipedia" may

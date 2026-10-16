@@ -32,6 +32,21 @@ Averages over the 3 prompts, one run each, so treat as rough.
 - Through the app's own code path (temp 0.6, top_p 0.9, repeat_penalty 1.1, 4 threads), 5 chat
   prompts generated at 27.0–30.9 tok/s, replies of 8–102 tokens, all ending on `<|eot_id|>`.
 
+## Two server slots (`-np 2`) — 2026-10-16
+
+The app now starts llama-server with `-np 2 -c 8192`: two 4096-token slots, chat on slot 0 and the
+action router on slot 1, so neither evicts the other's prompt cache. Measured on the M1, 4 threads,
+after filling every slot with a ~1.8k-token prompt:
+
+| Server | Load | Physical footprint (`footprint`) | RSS |
+|---|---|---|---|
+| `-np 1 -c 4096` (before) | 1.8 s | 513 MB | 1.58 GB |
+| `-np 2 -c 8192` (now) | 0.6 s | 869 MB | 1.76 GB |
+
+**Cost: ~356 MB** of extra memory (the second KV cache). RSS includes the memory-mapped model file,
+so the footprint column is the one to compare. Router calls take 0.8 s p50 / 1.2 s p95
+(`docs/evals.md`).
+
 ## Other backends tried (same machine, same day)
 
 | Backend | Generation (4 threads) | Peak RSS | Output |

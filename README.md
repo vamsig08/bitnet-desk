@@ -62,7 +62,15 @@ Type a command in the chat box and it happens right away, without asking the mod
 | `` run `git status` `` or `$ git status` | runs exactly that command in your home folder — **always asks** |
 
 Polite versions work too ("can you open Calculator for me?"). These work even while the model is
-still loading. Anything else goes to the chat as usual.
+still loading.
+
+If a message starts with *open, start, launch, download, find, run, play* or *show* (or with `/`)
+and isn't one of the commands above, the model gets about a second to decide whether it's a command
+("play some music", "launch the terminal for me"). It can only pick from the commands above, and
+it can't make up web addresses, file paths or shell commands: those must be in your message. When
+it guessed what you meant, the card says so, and **Just chat** answers your message normally
+instead. Everything else goes straight to the chat. How often the model gets it right is measured
+in `docs/evals.md`.
 
 **Permissions.** Every action has a risk level: *read-only*, *changes things*, *network* or *shell*.
 Read-only actions just run. Opening apps and files/folders runs straight away too, because they're on

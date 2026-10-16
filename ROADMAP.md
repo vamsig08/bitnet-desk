@@ -30,9 +30,9 @@ Each phase ends with something usable. Tick boxes as items land; keep the log at
 - [ ] Action log (local JSONL) + a window to review it
 - [x] Tools: current date/time, find files (`mdfind`), open app, open file/folder, open URL, start project (`[projects]` in config.toml), download to ~/Downloads, run shell command
 - [x] Fast path: rule-based matching for common commands, no model call
-- [ ] Model path: model picks one tool + JSON args under the server's `json_schema` grammar; confidence from token probabilities; grounding checks on arguments
-- [ ] Failure handling: unsure / no tool / bad arguments / server down (see design)
-- [ ] Action eval (~40 commands): fast path scored in pytest, model path by `python -m bitnet_desk.actions eval` → `docs/evals.md`
+- [x] Model path: model picks one tool + JSON args under the server's `json_schema` grammar; confidence from token probabilities; grounding checks on arguments
+- [x] Failure handling: unsure / no tool / bad arguments / server down (see design)
+- [x] Action eval (65 commands): fast path scored in pytest, model path by `python -m bitnet_desk.actions eval` → `docs/evals.md`
 
 **Done when:** "open Safari", "start project bitnet-desk", "download https://…", "find my resume" and
 "what time is it" all work from one chat box; non-read-only actions wait for one approval click; the
@@ -103,3 +103,4 @@ action log shows everything; eval numbers are recorded.
 - 2026-10-16: Actions step 2: chat box tries the fast path first (works while the model loads); auto-approved actions run and show a ✓/✗ line, others show an approval card with the exact command, risk badge and source — Run (⌘↩) / Deny (Esc); a new message or Clear denies an open card. README: Commands section.
 - 2026-10-16: Try-out fixes: fast path strips polite wrappers (can you / could you / please / for me / thanks…); date/time questions in many phrasings answered from the clock ("what time is it today" had reached the model, which gave a wrong date); `help` lists real commands from the registry. New system prompt: says it's a Mac assistant whose actions are done by the app, lists the commands, forbids claiming it did things (it had "set a timer"). Eval now 65 cases; fast path 28/28, no false triggers.
 - 2026-10-16: Actions step 3: start_project (`[projects]`; `open -a "Visual Studio Code"`, `code` CLI only if the app is missing; Terminal, configurable), open_url and download (network: always ask; https added to bare domains; no credentials-in-URL; ~/Downloads, never overwrites, size cap, quarantine flag, progress), find_files (mdfind; bounded name search when Spotlight returns nothing — it returns nothing for ~ on this Mac), run_shell (literal commands only, zsh in ~, 60 s). Clickable result paths go through the gate. Network-guard test. Fast path 39/39, no false triggers.
+- 2026-10-16: Actions step 4: model router (grammar-constrained JSON, per-message enums so URLs/commands/paths can only be copied; confidence from token probs, < 0.7 → chat), grounding (invented → chat, inferred → ask), command-verb check, `-np 2` (+356 MB footprint), "Just chat" on model cards, `python -m bitnet_desk.actions eval`. Results (`docs/evals.md`): fast path 39/39 with no false triggers; model path 55/65 (85%), tool choice 87%, args 82%; pipeline 60/65 (92%); 2 unsafe picks, both shown as cards (none auto-run).
