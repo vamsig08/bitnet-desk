@@ -28,7 +28,7 @@ system_prompt = "You are terse."
 ''')
     assert (config.THREADS, config.CTX, config.MAX_NEW_TOKENS) == (3, 2048, 256)
     assert config.TEMPERATURE == 1.0 and isinstance(config.TEMPERATURE, float)
-    assert llm.system_prompt().startswith("You are terse.\nToday is ")
+    assert llm.system_prompt().startswith("You are terse.\nCommands the app carries out")
     assert config.CONFIG_ERRORS == []
 
 

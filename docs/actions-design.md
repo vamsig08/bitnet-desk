@@ -145,6 +145,7 @@ Rules:
 
 | Tool | Args | Risk | Plan / command | Notes |
 |---|---|---|---|---|
+| `help` | – | read-only | answer built from the tool registry | Added after the try-out: the model invented abilities when asked "what can you do?". |
 | `now` | – | read-only | Python `datetime` | Answers "what time/day is it" without the model making it up. |
 | `find_files` | `query`, `kind?` (pdf/folder/image/…) | read-only | `mdfind -onlyin ~ -name <q>` (+ content query fallback) | Top 20 shown as clickable rows; clicking one goes through `open_path` (and its gate). |
 | `open_app` | `name` | changes | `open -a <resolved .app path>` | Name resolved against installed apps (`/Applications`, `/System/Applications`, `…/Utilities`, `~/Applications`) + aliases in config; fuzzy match with stdlib `difflib`. Unknown app → error with suggestions, never a guess. |
@@ -350,10 +351,10 @@ never states them as certain.
 Results go to `docs/evals.md` with date, commit, model file and threads, so a future model swap is a
 one-command comparison.
 
-### The 40 cases
+### The cases
 
 Fixture: apps Safari, Spotify, Music, Notes, Terminal, Visual Studio Code; project `bitnet-desk`
-(alias "bitnet desk") at `~/Projects/bitnet-desk`; folders ~/Documents, ~/Downloads, ~/Desktop.
+(alias "bitnet desk") at `~/Projects/bitnet-desk`; Calculator; folders ~/Documents, ~/Downloads, ~/Desktop.
 
 | # | Text | Expected tool | Expected args | Route |
 |---|---|---|---|---|
@@ -378,7 +379,7 @@ Fixture: apps Safari, Spotify, Music, Notes, Terminal, Visual Studio Code; proje
 | 19 | run `git status` | run_shell | command=git status | fast |
 | 20 | $ ls -la ~/Desktop | run_shell | command=ls -la ~/Desktop | fast |
 | 21 | play some music | open_app | name any_of [Music, Spotify] | model |
-| 22 | launch the terminal for me | open_app | name=Terminal | model |
+| 22 | launch the terminal for me | open_app | name=Terminal | fast |
 | 23 | show me what's on my desktop | open_path | path=~/Desktop | model |
 | 24 | start up my bitnet thing | start_project | name=bitnet-desk | model |
 | 25 | download the csv at https://x.org/data.csv | download | url=https://x.org/data.csv | model |
@@ -396,11 +397,39 @@ Fixture: apps Safari, Spotify, Music, Notes, Terminal, Visual Studio Code; proje
 | 37 | what does "open a can of worms" mean? | chat | – (verb check → chat) | chat |
 | 38 | write a haiku about autumn | chat | – | chat |
 | 39 | what is the capital of France | chat | – | chat |
-| 40 | is it friday yet? | now | – (known gate miss: no command verb) | chat |
+| 40 | is it friday yet? | now | – | fast |
+| 41 | can you open calculator for me | open_app | name=Calculator | fast |
+| 42 | could you please launch spotify | open_app | name=Spotify | fast |
+| 43 | will you open my documents folder for me? | open_path | path=~/Documents | fast |
+| 44 | would you open safari please, thanks | open_app | name=Safari | fast |
+| 45 | please could you open notes for me | open_app | name=Notes | fast |
+| 46 | hey, can you tell me what time it is? | now | – | fast |
+| 47 | can you explain how to open a file in Python? | chat | – (polite wrapper around a non-command) | chat |
+| 48 | could you write me a poem for my mom | chat | – (polite wrapper around a non-command) | chat |
+| 49 | can you open up about your feelings? | chat | – (polite + command verb, but not a command) | model |
+| 50 | please tell me a joke | chat | – (polite wrapper around a non-command) | chat |
+| 51 | what time is it today | now | – | fast |
+| 52 | whats todays date? | now | – | fast |
+| 53 | what day of the week is it | now | – | fast |
+| 54 | what year is it | now | – | fast |
+| 55 | tell me the time | now | – | fast |
+| 56 | do you know what time it is? | now | – | fast |
+| 57 | what's the current date and time | now | – | fast |
+| 58 | today's date please | now | – | fast |
+| 59 | what time is the next SpaceX launch? | chat | – (about a time, not the current time) | chat |
+| 60 | what time is it in Tokyo? | chat | – (another time zone: not the local clock) | chat |
+| 61 | how many days until Christmas? | chat | – (date arithmetic, not the current date) | chat |
+| 62 | what can you do? | help | – | fast |
+| 63 | help | help | – | fast |
+| 64 | could you list your commands | help | – | fast |
+| 65 | can you help me write a cover letter? | chat | – ('help' inside a request isn't the help command) | chat |
 
-Mix: 20 fast-path actions, 7 model-only actions, 8 must-not-act cases that reach the model (4 "don't
-invent" + 4 verb-check traps), 4 that the verb check must keep away from the model, 1 known gate
-miss. If a fast rule is widened later, the case's `route` changes with it and the eval prints
+Cases 41–61 were added after the first try-out (2026-10-16): polite wrappers around commands and
+non-commands, many phrasings of "what time/date is it", and time questions that must *not* be
+answered from the local clock. Date/time questions are always answered by the fast path from the
+system clock, never by the model.
+
+If a fast rule is widened later, the case's `route` changes with it and the eval prints
 per-case diffs. The set grows with every new tool; a tool doesn't ship without cases.
 
 ---

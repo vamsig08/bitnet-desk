@@ -190,10 +190,34 @@ def test_fast_path_phrasings(fake_mac, text):
     assert m and m.tool == "open_app" and m.args == {"name": "Notes"}
 
 
+@pytest.mark.parametrize("text", ["can you open calculator for me", "could you please launch calculator",
+                                  "will you open calculator?", "open calculator please, thanks",
+                                  "hey, open calculator for me", "Kindly open Calculator."])
+def test_polite_wrappers_around_commands(fake_mac, text):
+    m = fastpath.match(text)
+    assert m and m.tool == "open_app" and m.args == {"name": "Calculator"}
+
+
+@pytest.mark.parametrize("text", ["can you explain how to open a file?", "could you write me a poem for my mom",
+                                  "please tell me a joke", "can you open up about your feelings?"])
+def test_polite_wrappers_dont_make_commands(fake_mac, text):
+    assert fastpath.match(text) is None
+
+
 @pytest.mark.parametrize("text", ["what's the time", "What time is it right now?", "what’s the date today",
-                                  "what day is it", "time"])
+                                  "what day is it", "time", "what time is it today", "whats todays date",
+                                  "what day of the week is it", "what year is it", "tell me the time",
+                                  "do you know what time it is?", "what's the current date and time",
+                                  "is it friday yet?", "can you tell me what time it is please"])
 def test_fast_path_time(fake_mac, text):
     assert fastpath.match(text).tool == "now"
+
+
+@pytest.mark.parametrize("text", ["what time is it in Tokyo", "what time is the next SpaceX launch",
+                                  "how many days until Christmas", "what day is christmas",
+                                  "what date was the moon landing", "tell me about time travel"])
+def test_other_time_questions_are_not_the_clock(fake_mac, text):
+    assert fastpath.match(text) is None
 
 
 @pytest.mark.parametrize("text", ["open a can of worms", "start thinking about lunch", "show me how loops work",
@@ -206,3 +230,13 @@ def test_fast_path_doesnt_guess(fake_mac, text):
 
 def test_unknown_names_fall_through_instead_of_failing(fake_mac):
     assert fastpath.match("open spot") is None            # model path/chat decides, not a wrong app
+
+
+@pytest.mark.parametrize("text", ["what can you do?", "help", "Could you list your commands", "what else can you do"])
+def test_help_lists_the_real_commands(fake_mac, text):
+    out = handle(text)
+    assert out.kind == "done" and 'open an app ("open Safari")' in out.result.message
+
+
+def test_help_inside_a_request_is_chat(fake_mac):
+    assert fastpath.match("can you help me write a cover letter?") is None

@@ -81,8 +81,17 @@ def test_read_text_file_truncates(tmp_path):
 
 def test_system_prompt_has_date_and_weekday_but_not_time():
     now = datetime(2026, 10, 16, 9, 5, tzinfo=timezone(timedelta(hours=1), "BST"))
-    assert llm.system_prompt(now) == config.SYSTEM_PROMPT + "\nToday is Friday, 16 October 2026."
+    prompt = llm.system_prompt(now)
+    assert prompt.startswith(config.SYSTEM_PROMPT + "\n")
+    assert prompt.endswith("\nToday is Friday, 16 October 2026.") and "09:05" not in prompt
     assert llm.time_note(now) == "\n\n(Local time: 09:05 BST)"
+
+
+def test_system_prompt_lists_commands_and_forbids_claiming_actions():
+    prompt = llm.system_prompt()
+    assert 'open an app ("open Safari")' in prompt and "what time is it" in prompt
+    assert "Never claim you did something" in prompt and "Never say you are just an AI" in prompt
+    assert "running entirely offline" not in prompt          # the old wording made it say "I'm offline"
 
 
 def _clock(monkeypatch, *times):

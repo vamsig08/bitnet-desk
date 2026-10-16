@@ -10,15 +10,29 @@ from .registry import TOOLS, ActionError, Plan
 from .resolve import KNOWN_FOLDERS
 
 _I = re.IGNORECASE
-POLITE_START = re.compile(r"^(?:(?:please|pls|hey|ok|okay|can you|could you|would you|will you)\b[\s,]*)+", _I)
-POLITE_END = re.compile(r"[\s,]*\bplease$", _I)
+POLITE_START = re.compile(
+    r"^(?:(?:please|pls|kindly|hey|hi|ok|okay|so|can you|could you|would you|will you|can u|could u)"
+    r"\b[\s,]*)+", _I)
+POLITE_END = re.compile(r"(?:[\s,]+(?:please|for me|thanks|thank you|thx|if you can|if you could))+$", _I)
 
-NOW = re.compile(
-    r"(?:what(?:'s| is) the (?:time|date|day)(?: today| now| right now)?"
-    r"|what time is it(?: now| right now)?"
-    r"|what(?:'s| is) today(?:'s date)?"
-    r"|what (?:day|date) is it(?: today)?"
-    r"|time|date)", _I)
+# Questions about the current date/time. Answered from the clock, never by the model.
+_WHEN = r"(?:\s+(?:today|now|right now|currently|at the moment|here))*"
+_WHAT = (r"time|date|day|year|month|day of the week|weekday|date and time|time and date|"
+         r"day and date|date and day")
+_DAYS = r"monday|tuesday|wednesday|thursday|friday|saturday|sunday|the weekend|a weekday"
+NOW = re.compile("|".join([
+    rf"what(?:'?s| is)?(?: the)?(?: current| exact)? (?:{_WHAT})(?: is it| it is| is today)?{_WHEN}",
+    rf"(?:what|which) (?:{_WHAT}) (?:is it|it is|is today){_WHEN}",
+    rf"(?:what'?s|what is) (?:today|today'?s date){_WHEN}",
+    rf"(?:today'?s |the |current )?(?:{_WHAT})(?: today| now| right now)?|today",
+    rf"(?:tell me|give me|show me|do you know|got|have you got) (?:the (?:{_WHAT})|what (?:{_WHAT}) it is){_WHEN}",
+    rf"is it (?:{_DAYS})(?: today| yet| already)?",
+    r"how late is it",
+]), _I)
+HELP = re.compile(
+    r"help|what can you do(?: for me)?|what (?:else )?can (?:you|i ask you to) do|what do you do"
+    r"|what are your (?:commands|abilities|skills)|what commands (?:do you know|are there|can i use)"
+    r"|(?:list|show) (?:your |the )?commands", _I)
 OPEN = re.compile(r"(?:open|launch|start|show me|show)\s+(.+)", _I)
 
 
@@ -31,9 +45,9 @@ class Match:
 
 def normalise(text):
     """Collapse spaces, straighten quotes, drop polite openers/closers and trailing punctuation."""
-    t = " ".join(text.replace("’", "'").replace("‘", "'").split())
+    t = " ".join(text.replace("’", "'").replace("‘", "'").split()).rstrip("?!. ")
     t = POLITE_END.sub("", POLITE_START.sub("", t))
-    return t.rstrip("?!. ")
+    return t.rstrip("?!., ")
 
 
 def _try(tool, args):
@@ -66,7 +80,11 @@ def _now(text):
     return _try("now", {}) if NOW.fullmatch(text) else None
 
 
-RULES = [_now, _open]
+def _help(text):
+    return _try("help", {}) if HELP.fullmatch(text) else None
+
+
+RULES = [_help, _now, _open]
 
 
 def match(text):

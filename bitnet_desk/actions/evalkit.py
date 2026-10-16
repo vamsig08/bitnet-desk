@@ -12,11 +12,11 @@ from . import fastpath
 from .registry import TOOLS
 
 CASES = cfg.HERE / "evals" / "actions.jsonl"
-PLANNED_TOOLS = {"now", "open_app", "open_path", "open_url", "start_project", "download",
+PLANNED_TOOLS = {"help", "now", "open_app", "open_path", "open_url", "start_project", "download",
                  "find_files", "run_shell", "chat"}
 ROUTES = {"fast", "model", "chat"}
 
-FIXTURE_APPS = ["Safari", "Spotify", "Music", "Notes", "Visual Studio Code", "Utilities/Terminal"]
+FIXTURE_APPS = ["Safari", "Spotify", "Music", "Notes", "Calculator", "Visual Studio Code", "Utilities/Terminal"]
 FIXTURE_DIRS = ["Documents", "Downloads", "Desktop", "Projects/bitnet-desk"]
 
 

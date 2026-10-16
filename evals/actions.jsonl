@@ -19,7 +19,7 @@
 {"id": 19, "text": "run `git status`", "tool": "run_shell", "args": {"command": "git status"}, "route": "fast"}
 {"id": 20, "text": "$ ls -la ~/Desktop", "tool": "run_shell", "args": {"command": "ls -la ~/Desktop"}, "route": "fast"}
 {"id": 21, "text": "play some music", "tool": "open_app", "args": {"name": {"any_of": ["Music", "Spotify"]}}, "route": "model"}
-{"id": 22, "text": "launch the terminal for me", "tool": "open_app", "args": {"name": "Terminal"}, "route": "model"}
+{"id": 22, "text": "launch the terminal for me", "tool": "open_app", "args": {"name": "Terminal"}, "route": "fast"}
 {"id": 23, "text": "show me what's on my desktop", "tool": "open_path", "args": {"path": "~/Desktop"}, "route": "model"}
 {"id": 24, "text": "start up my bitnet thing", "tool": "start_project", "args": {"name": "bitnet-desk"}, "route": "model"}
 {"id": 25, "text": "download the csv at https://x.org/data.csv", "tool": "download", "args": {"url": "https://x.org/data.csv"}, "route": "model"}
@@ -37,4 +37,29 @@
 {"id": 37, "text": "what does \"open a can of worms\" mean?", "tool": "chat", "args": {}, "route": "chat", "note": "verb check sends to chat"}
 {"id": 38, "text": "write a haiku about autumn", "tool": "chat", "args": {}, "route": "chat"}
 {"id": 39, "text": "what is the capital of France", "tool": "chat", "args": {}, "route": "chat"}
-{"id": 40, "text": "is it friday yet?", "tool": "now", "args": {}, "route": "chat", "note": "known gate miss: no command verb"}
+{"id": 40, "text": "is it friday yet?", "tool": "now", "args": {}, "route": "fast"}
+{"id": 41, "text": "can you open calculator for me", "tool": "open_app", "args": {"name": "Calculator"}, "route": "fast"}
+{"id": 42, "text": "could you please launch spotify", "tool": "open_app", "args": {"name": "Spotify"}, "route": "fast"}
+{"id": 43, "text": "will you open my documents folder for me?", "tool": "open_path", "args": {"path": "~/Documents"}, "route": "fast"}
+{"id": 44, "text": "would you open safari please, thanks", "tool": "open_app", "args": {"name": "Safari"}, "route": "fast"}
+{"id": 45, "text": "please could you open notes for me", "tool": "open_app", "args": {"name": "Notes"}, "route": "fast"}
+{"id": 46, "text": "hey, can you tell me what time it is?", "tool": "now", "args": {}, "route": "fast"}
+{"id": 47, "text": "can you explain how to open a file in Python?", "tool": "chat", "args": {}, "route": "chat", "note": "polite wrapper around a non-command"}
+{"id": 48, "text": "could you write me a poem for my mom", "tool": "chat", "args": {}, "route": "chat", "note": "polite wrapper around a non-command"}
+{"id": 49, "text": "can you open up about your feelings?", "tool": "chat", "args": {}, "route": "model", "note": "polite + command verb, but not a command"}
+{"id": 50, "text": "please tell me a joke", "tool": "chat", "args": {}, "route": "chat", "note": "polite wrapper around a non-command"}
+{"id": 51, "text": "what time is it today", "tool": "now", "args": {}, "route": "fast"}
+{"id": 52, "text": "whats todays date?", "tool": "now", "args": {}, "route": "fast"}
+{"id": 53, "text": "what day of the week is it", "tool": "now", "args": {}, "route": "fast"}
+{"id": 54, "text": "what year is it", "tool": "now", "args": {}, "route": "fast"}
+{"id": 55, "text": "tell me the time", "tool": "now", "args": {}, "route": "fast"}
+{"id": 56, "text": "do you know what time it is?", "tool": "now", "args": {}, "route": "fast"}
+{"id": 57, "text": "what's the current date and time", "tool": "now", "args": {}, "route": "fast"}
+{"id": 58, "text": "today's date please", "tool": "now", "args": {}, "route": "fast"}
+{"id": 59, "text": "what time is the next SpaceX launch?", "tool": "chat", "args": {}, "route": "chat", "note": "about a time, not the current time"}
+{"id": 60, "text": "what time is it in Tokyo?", "tool": "chat", "args": {}, "route": "chat", "note": "another time zone: not the local clock"}
+{"id": 61, "text": "how many days until Christmas?", "tool": "chat", "args": {}, "route": "chat", "note": "date arithmetic, not the current date"}
+{"id": 62, "text": "what can you do?", "tool": "help", "args": {}, "route": "fast"}
+{"id": 63, "text": "help", "tool": "help", "args": {}, "route": "fast"}
+{"id": 64, "text": "could you list your commands", "tool": "help", "args": {}, "route": "fast"}
+{"id": 65, "text": "can you help me write a cover letter?", "tool": "chat", "args": {}, "route": "chat", "note": "'help' inside a request is not the help command"}

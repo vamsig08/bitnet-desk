@@ -1,8 +1,15 @@
-"""now, open_app, open_path."""
+"""help, now, open_app, open_path."""
 from datetime import datetime
 
-from ..registry import Plan, Risk, Tool, register
+from ..registry import Plan, Risk, Tool, capabilities, register
 from ..resolve import find_app, find_path, path_risk, tilde
+
+
+def _help(args):
+    return Plan(tool="help", args={}, risk=Risk.READ_ONLY, summary="List what I can do",
+                answer=f"Commands I carry out on your Mac: {capabilities()}. "
+                       "Anything else, just ask — I'll answer in chat (answers, explanations, "
+                       "writing, code).")
 
 
 def _now(args):
@@ -33,8 +40,11 @@ def _string(max_len):
     return {"type": "string", "maxLength": max_len}
 
 
-register(Tool("now", "now", "tell the current date and time", {}, Risk.READ_ONLY, _now))
+register(Tool("help", "help", "list what the app can do", {}, Risk.READ_ONLY, _help))
+register(Tool("now", "now", "tell the current date and time", {}, Risk.READ_ONLY, _now,
+              'tell the date and time ("what time is it")'))
 register(Tool("open_app", "app", "launch a Mac application",
-              {"name": _string(60)}, Risk.CHANGES, _open_app))
+              {"name": _string(60)}, Risk.CHANGES, _open_app, 'open an app ("open Safari")'))
 register(Tool("open_path", "path", "open a file or folder the user named",
-              {"path": _string(200)}, Risk.CHANGES, _open_path))
+              {"path": _string(200)}, Risk.CHANGES, _open_path,
+              'open a file or folder ("open my Downloads folder")'))

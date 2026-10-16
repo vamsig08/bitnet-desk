@@ -27,9 +27,12 @@ def _now():
 
 
 def system_prompt(now=None):
-    """The configured system prompt plus today's date and weekday (changes once a day)."""
+    """The configured system prompt, what the app can do, and today's date (changes once a day)."""
+    from .actions import capabilities
     now = now or _now()
-    return f"{cfg.SYSTEM_PROMPT}\nToday is {now:%A}, {now.day} {now:%B} {now.year}."
+    return (f"{cfg.SYSTEM_PROMPT}\n"
+            f"Commands the app carries out itself when the user types them: {capabilities()}.\n"
+            f"Today is {now:%A}, {now.day} {now:%B} {now.year}.")
 
 
 def time_note(now=None):

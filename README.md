@@ -53,9 +53,11 @@ Type a command in the chat box and it happens right away, without asking the mod
 |---|---|
 | `open Safari`, `launch Spotify`, `open vs code` | opens the app |
 | `open my downloads folder`, `open ~/Documents` | opens the folder in Finder |
-| `what time is it`, `what's the date today` | answers from your Mac's clock |
+| `what time is it`, `what's the date today`, `is it friday yet?` | answers from your Mac's clock (never the model) |
+| `what can you do?`, `help` | lists the commands |
 
-These work even while the model is still loading. Anything else goes to the chat as usual.
+Polite versions work too ("can you open Calculator for me?"). These work even while the model is
+still loading. Anything else goes to the chat as usual.
 
 **Permissions.** Every action has a risk level: *read-only*, *changes things*, *network* or *shell*.
 Read-only actions just run. Opening apps and files/folders runs straight away too, because they're on

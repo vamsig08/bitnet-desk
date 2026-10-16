@@ -59,6 +59,7 @@ class Tool:
     args: dict                  # JSON schema of the arguments
     risk: Risk                  # base risk
     plan: Callable = field(repr=False)   # args -> Plan, or raise ActionError
+    example: str = ""           # for the system prompt: 'open an app ("open Safari")'
 
     def make_plan(self, args):
         plan = self.plan(args)
@@ -68,6 +69,11 @@ class Tool:
 
 
 TOOLS = {}
+
+
+def capabilities():
+    """What the app can do, for the system prompt and `help`: 'open an app ("open Safari"); …'."""
+    return "; ".join(t.example for t in TOOLS.values() if t.example)
 
 
 def register(tool):
