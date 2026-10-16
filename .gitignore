@@ -1,0 +1,14 @@
+# upstream runtime + model weights (rebuilt by setup.sh)
+BitNet/
+*.gguf
+
+# python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# runtime
+server.log
+*.sqlite
+.DS_Store
