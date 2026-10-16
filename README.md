@@ -74,8 +74,8 @@ large cloud models on niche facts, long multi-step reasoning, and non-trivial co
 factual answers as a starting point.
 
 ## Troubleshooting
-- **Apple Silicon (M1/M2/M3/M4): replies are garbage or rambling** — known issue as of Oct 2026;
-  neither backend gives good answers yet. Details and options: `docs/setup-notes.md`.
+- **Apple Silicon: replies are `!!!!` or `@@@@`** — your `BitNet/` checkout is newer than the pinned
+  commit (e.g. you set `BITNET_REF`). Re-run `./setup.sh` without it. Why: `docs/setup-notes.md`.
 - **"llama-server not found"** — setup didn't finish; re-run it and check the build output.
 - **"Model server exited"** — read `server.log`. Port in use? Try `BITNET_PORT=8090`.
 - **Garbled / run-on replies** — make sure you used the `i2_s` GGUF from

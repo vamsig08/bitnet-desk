@@ -34,10 +34,10 @@ fi
   || { echo "$PYTHON is not Python 3.9–3.12. Set PYTHON=… to a compatible one."; exit 1; }
 echo "Using $("$PYTHON" --version) at $(command -v "$PYTHON")"
 
-# Pin upstream: on 2026-07-15 BitNet HEAD switched llama.cpp to a new fork that builds broken on
-# macOS (split ggml libs fail to link) and produces garbage with the 2B4T i2_s model.
-# 1876a3e (2026-01-27) is the last commit before that.
-BITNET_REF="${BITNET_REF:-1876a3e8895f5f88f976760fdbc588c1eafa2d48}"
+# Pin upstream to 765741d (2025-05-21). Later commits break the official HF i2_s GGUF on ARM:
+# since 112f853 (2025-11) ARM kernels expect 64-wide i2_s blocks but the file has 128-wide ones,
+# and HEAD (2026-07) moved llama.cpp to a fork that doesn't link on macOS. See docs/setup-notes.md.
+BITNET_REF="${BITNET_REF:-765741d80bda4d3069e367bf0062134891232cce}"
 if [ ! -d BitNet ]; then
   git clone https://github.com/microsoft/BitNet.git
 fi
@@ -84,10 +84,8 @@ if [ ! -x build/bin/llama-server ]; then
   cmake --build build --config Release --target llama-server -j
 fi
 
+# setup_env.py's codegen writes these into the checkout; they are only needed while compiling.
+rm -f include/bitnet-lut-kernels.h include/kernel_config.ini
+
 echo
 echo "Done. Start the assistant with:  $PYTHON assistant.py"
-if [ "$(uname -s)" = "Darwin" ] && [ "$(uname -m)" = "arm64" ]; then
-  echo
-  echo "WARNING: on Apple Silicon this bitnet.cpp build gives garbage output with the HF i2_s model"
-  echo "(ARM kernels expect a different i2_s block layout). See docs/setup-notes.md."
-fi

@@ -11,3 +11,8 @@ if(APPLE)
   # std::wstring_convert (<locale>, included only on Windows), imatrix.cpp uses std::chrono.
   string(APPEND CMAKE_CXX_FLAGS_INIT " -Wno-elaborated-enum-base -include locale -include chrono")
 endif()
+
+# We only run the i2_s model, whose kernels (src/ggml-bitnet-mad.cpp) don't need TL1. The pinned
+# setup_env.py turns TL1 on for arm64, and its generated LUT kernel takes 30+ min to compile (or
+# never finishes) with Apple clang 17 and LLVM 23. Override it.
+set(BITNET_ARM_TL1 OFF CACHE BOOL "i2_s only; TL1 LUT kernels hang the compiler" FORCE)

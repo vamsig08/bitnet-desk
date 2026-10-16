@@ -58,7 +58,8 @@ above without changing behaviour.
 - `bitnet.cpp` wants clang ≥ 18 (Apple clang 17 hangs/miscompiles). `setup.sh` uses Homebrew LLVM
   automatically if installed (`brew install llvm`); `CC=`/`CXX=` don't work because `setup_env.py`
   hardcodes `clang`. Extra CMake settings live in `cmake/bitnet-build.cmake`.
-- Apple Silicon status, pinned BitNet commit and known model-output problems: `docs/setup-notes.md`.
+- BitNet is pinned to `765741d` (May 2025) on purpose (newer commits break the HF i2_s GGUF on ARM).
+  Why, plus build flags and things tried: `docs/setup-notes.md`. Don't bump the pin without re-testing output.
 - Tkinter from Homebrew Python needs the matching `python-tk@3.x` formula.
 - If `setup_env.py` fails, read its log under `BitNet/logs/` before changing anything.
 
