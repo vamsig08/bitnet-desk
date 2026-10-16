@@ -7,7 +7,7 @@ from pathlib import Path
 from .. import actions
 from .. import config as cfg
 from .. import llm, server
-from ..actions import permissions
+from ..actions import permissions, pipeline
 from . import cards
 
 
@@ -123,16 +123,27 @@ def run_app():
                 self.write("The model is still loading — commands like “open Safari” already work.\n\n", "note")
                 return
             self.entry.delete("1.0", "end")
+            if not self.attachment and pipeline.wants_router(msg):
+                self.write("You: ", "user")
+                self.write(msg + "\n\n")
+                self.busy = True
+                self.status.config(text="Working out whether that's a command…")
+                threading.Thread(target=self.route, args=(msg,), daemon=True).start()
+                return
+            self.start_chat(msg)
+
+        def start_chat(self, msg, user_written=False):
             shown = msg
-            if self.attachment:
+            if self.attachment and not user_written:
                 name, text, _ = self.attachment
                 msg = f'Here is the content of the file "{name}":\n"""\n{text}\n"""\n\n{msg}'
                 shown = f"[📎 {name}] {shown}"
                 self.attachment = None
                 self.attach_lbl.config(text="")
             self.history.append(("user", msg))
-            self.write("You: ", "user")
-            self.write(shown + "\n\n")
+            if not user_written:
+                self.write("You: ", "user")
+                self.write(shown + "\n\n")
             self.write("Assistant: ", "bot")
 
             self.history, prompt = llm.prepare(self.history)
@@ -159,6 +170,36 @@ def run_app():
             else:
                 self.show_result(outcome.proposal.plan, outcome.result)
             return True
+
+        def route(self, msg):
+            """Background thread: ask the model which tool fits (only for command-verb messages)."""
+            try:
+                outcome = pipeline.handle_model(msg)
+            except Exception:                  # router unavailable: answer in chat instead
+                outcome = None
+            self.q.put(("routed", (msg, outcome)))
+
+        def on_routed(self, msg, outcome):
+            self.busy = False
+            if outcome is None or outcome.kind == "chat":
+                self.start_chat(msg, user_written=True)
+            elif outcome.kind == "ask":
+                self.show_card(outcome.proposal)
+            elif outcome.kind == "done":
+                self.show_result(outcome.proposal.plan, outcome.result)
+                self.status.config(text="Ready")
+            else:                              # refused: the user named something that isn't there
+                hint = f" Did you mean: {', '.join(outcome.suggestions)}?" if outcome.suggestions else ""
+                self.write(f"✗ {outcome.message}{hint}\n\n", "fail")
+                self.status.config(text="Ready")
+
+        def just_chat(self):
+            """Card button on model suggestions: drop the action, answer the message in chat."""
+            if not self.pending:
+                return
+            text = self.pending[0].text
+            self.resolve_card(False, "Answered in chat instead — nothing was run.")
+            self.start_chat(text, user_written=True)
 
         def show_result(self, plan, result):
             if result.ok and plan.answer:
@@ -202,7 +243,8 @@ def run_app():
         def show_card(self, proposal):
             frame, run_btn, deny_btn, status = cards.build_card(
                 self.chat, cards.card_for(proposal),
-                on_run=lambda: self.resolve_card(True), on_deny=lambda: self.resolve_card(False))
+                on_run=lambda: self.resolve_card(True), on_deny=lambda: self.resolve_card(False),
+                on_chat=self.just_chat if proposal.route == "model" else None)
             self.chat.configure(state="normal")
             self.chat.window_create("end", window=frame)
             self.chat.insert("end", "\n\n")
@@ -216,8 +258,8 @@ def run_app():
                 return
             proposal, run_btn, deny_btn, status = self.pending
             self.pending = None
-            run_btn.config(state="disabled")
-            deny_btn.config(state="disabled")
+            for button in run_btn.master.winfo_children():     # Run, Deny and Just chat
+                button.config(state="disabled")
             if not approved:
                 permissions.deny(proposal)
                 status.config(text=denied_text, fg="#888888")
@@ -309,6 +351,8 @@ def run_app():
                         self.write(val)
                     elif kind in ("done", "err"):
                         self.finish(kind, val)
+                    elif kind == "routed":
+                        self.on_routed(*val)
                     elif kind == "progress":
                         status, text = val
                         try:

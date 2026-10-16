@@ -30,6 +30,8 @@ def card_for(proposal):
     source = SOURCES.get(proposal.route, proposal.route)
     if proposal.confidence is not None:
         source += f" Confidence {proposal.confidence:.0%}."
+    if proposal.must_ask and proposal.route == "model":
+        source += " It guessed what you meant, so it asks first."
     return Card(title=plan.summary, badge=plan.risk.label.upper(), colour=RISK_COLOURS[plan.risk],
                 commands="\n".join(plan.shown_commands()), note=RISK_NOTES.get(plan.risk, ""),
                 source=source)
@@ -39,8 +41,10 @@ def outcome_line(result):
     return ("✓ " if result.ok else "✗ ") + result.message
 
 
-def build_card(parent, card, on_run, on_deny):
-    """The card widget. Returns (frame, run_button, deny_button, status_label)."""
+def build_card(parent, card, on_run, on_deny, on_chat=None):
+    """The card widget. Returns (frame, run_button, deny_button, status_label).
+
+    on_chat adds a "Just chat" button (model suggestions: "that wasn't a command")."""
     import tkinter as tk
 
     f = tk.Frame(parent, bg=CARD_BG, bd=1, relief="solid", padx=10, pady=8)
@@ -62,6 +66,8 @@ def build_card(parent, card, on_run, on_deny):
     run_btn.pack(side="right")
     deny_btn = tk.Button(btns, text="Deny (Esc)", command=on_deny)
     deny_btn.pack(side="right", padx=6)
+    if on_chat:
+        tk.Button(btns, text="Just chat", command=on_chat).pack(side="right")
     status = tk.Label(f, text="", bg=CARD_BG, anchor="w", justify="left", wraplength=620)
     status.pack(fill="x")
     return f, run_btn, deny_btn, status

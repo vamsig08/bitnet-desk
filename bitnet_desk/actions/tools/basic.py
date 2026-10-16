@@ -15,7 +15,7 @@ def _help(args):
 def _now(args):
     now = datetime.now().astimezone()
     return Plan(tool="now", args={}, risk=Risk.READ_ONLY, summary="Tell the current date and time",
-                answer=f"It's {now:%H:%M} on {now:%A}, {now.day} {now:%B} {now.year}.")
+                answer=f"It's {now:%H:%M} (local time) on {now:%A}, {now.day} {now:%B} {now.year}.")
 
 
 def _open_app(args):

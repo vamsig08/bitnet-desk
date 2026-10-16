@@ -130,7 +130,7 @@ def stream_completion(prompt, on_token, stop_event):
     body = json.dumps({
         "prompt": prompt, "n_predict": cfg.MAX_NEW_TOKENS, "temperature": cfg.TEMPERATURE,
         "top_p": 0.9, "repeat_penalty": 1.1, "stop": STOP,
-        "stream": True, "cache_prompt": True,
+        "stream": True, "cache_prompt": True, "id_slot": cfg.CHAT_SLOT,
     }).encode()
     req = urllib.request.Request(cfg.BASE + "/completion", data=body,
                                  headers={"Content-Type": "application/json"})
@@ -147,6 +147,36 @@ def stream_completion(prompt, on_token, stop_event):
             if data.get("stop"):
                 return data.get("timings", {})
     return {}
+
+
+@functools.lru_cache(maxsize=8)
+def _total_slots(base):
+    with urllib.request.urlopen(base + "/props", timeout=5) as r:
+        return int(json.load(r).get("total_slots", 1))
+
+
+def server_slots():
+    """How many slots the running server has (1 if it can't say). Failures aren't cached."""
+    try:
+        return _total_slots(cfg.BASE)
+    except Exception:
+        return 1
+
+
+def complete_json(prompt, schema, n_predict=96, n_probs=10, timeout=60):
+    """One grammar-constrained completion (not streamed) for the action router.
+
+    Pins the router slot only if the server has it — a request for a missing slot would wait forever.
+    Returns the server's JSON: content, completion_probabilities, timings.
+    """
+    body = {"prompt": prompt, "n_predict": n_predict, "temperature": 0, "json_schema": schema,
+            "n_probs": n_probs, "cache_prompt": True, "stop": STOP}
+    if server_slots() > cfg.ROUTER_SLOT:
+        body["id_slot"] = cfg.ROUTER_SLOT
+    req = urllib.request.Request(cfg.BASE + "/completion", data=json.dumps(body).encode(),
+                                 headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.load(r)
 
 
 def read_text_file(path):

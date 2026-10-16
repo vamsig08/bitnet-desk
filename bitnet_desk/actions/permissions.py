@@ -21,6 +21,7 @@ class Proposal:
     route: str                  # "fast" or "model"
     plan: object
     confidence: float | None = None
+    must_ask: bool = False      # the model was unsure or inferred the target: ask even if auto-approved
 
 
 def auto_approved():
@@ -44,13 +45,17 @@ def needs_approval(plan):
     return not (plan.risk == Risk.CHANGES and plan.tool in auto_approved())
 
 
+def proposal_needs_approval(proposal):
+    return proposal.must_ask or needs_approval(proposal.plan)
+
+
 def run(proposal, approved=False, runner=subprocess.run, progress=None):
     """Execute the plan exactly as shown. Raises PermissionError if it needs an approval it didn't get.
 
     `progress(text)` is called from long-running tools (downloads) with a status line.
     """
     plan = proposal.plan
-    ask = needs_approval(plan)
+    ask = proposal_needs_approval(proposal)
     if ask and not approved:
         raise PermissionError(f"{plan.tool} needs the user's approval")
     t0 = time.monotonic()

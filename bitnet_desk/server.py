@@ -38,8 +38,8 @@ def supports_device_none(exe):
 
 
 def server_cmd(exe):
-    cmd = [str(exe), "-m", str(cfg.MODEL), "-c", str(cfg.CTX), "-t", str(cfg.THREADS),
-           "-ngl", "0", "--host", cfg.HOST, "--port", str(cfg.PORT)]
+    cmd = [str(exe), "-m", str(cfg.MODEL), "-c", str(cfg.CTX * cfg.SLOTS), "-np", str(cfg.SLOTS),
+           "-t", str(cfg.THREADS), "-ngl", "0", "--host", cfg.HOST, "--port", str(cfg.PORT)]
     if supports_device_none(exe):
         cmd += ["--device", "none"]
     return cmd

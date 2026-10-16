@@ -158,7 +158,11 @@ SERVER_BIN = os.environ.get("BITNET_SERVER")
 HOST = "127.0.0.1"                      # never 0.0.0.0 — keeps the model local-only
 PORT = int(os.environ.get("BITNET_PORT", "8080"))
 BASE = f"http://{HOST}:{PORT}"
-CTX = _setting("ctx", 4096)
+CTX = _setting("ctx", 4096)              # per conversation (per server slot)
+# Two server slots, each CTX tokens: chat uses slot 0, the action router slot 1, so neither evicts
+# the other's prompt cache. Costs ~350 MB more RAM on M1 (docs/benchmarks.md).
+SLOTS = 2
+CHAT_SLOT, ROUTER_SLOT = 0, 1
 THREADS = _setting("threads", max(1, (os.cpu_count() or 4) // 2))
 MAX_NEW_TOKENS = _setting("max_tokens", 768)
 TEMPERATURE = _setting("temperature", 0.6)

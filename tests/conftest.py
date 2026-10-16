@@ -28,6 +28,7 @@ def reload_config():
     def reload():
         importlib.reload(config)
         llm._server_tokens.cache_clear()
+        llm._total_slots.cache_clear()
     return reload
 
 
@@ -52,11 +53,13 @@ def isolated_settings(tmp_path, monkeypatch, reload_config):
 def mock_server(monkeypatch, reload_config):
     """A fake llama-server on 127.0.0.1 with /health, /tokenize and streaming /completion.
 
-    Set `.reply` to change the streamed tokens. `.seen` records the last /completion body and how
-    many /tokenize calls were made.
+    Set `.reply` to change the streamed tokens, `.json_reply` (a dict, or a function of the request
+    body) for non-streamed router calls, `.slots` for /props. `.seen` records /completion bodies and
+    how many /tokenize calls were made.
     """
-    ns = SimpleNamespace(port=free_port(), seen={"tokenize_calls": 0},
-                         reply=["Hel", "lo", " there"], timings={"predicted_per_second": 31.4})
+    ns = SimpleNamespace(port=free_port(), seen={"tokenize_calls": 0, "bodies": []},
+                         reply=["Hel", "lo", " there"], timings={"predicted_per_second": 31.4},
+                         slots=2, json_reply=None)
 
     class Handler(http.server.BaseHTTPRequestHandler):
         def log_message(self, *a):
@@ -65,7 +68,10 @@ def mock_server(monkeypatch, reload_config):
         def do_GET(self):
             self.send_response(200)
             self.end_headers()
-            self.wfile.write(b'{"status":"ok"}')
+            if self.path == "/props":
+                self.wfile.write(json.dumps({"total_slots": ns.slots}).encode())
+            else:
+                self.wfile.write(b'{"status":"ok"}')
 
         def do_POST(self):
             body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
@@ -76,6 +82,13 @@ def mock_server(monkeypatch, reload_config):
                 self.wfile.write(json.dumps({"tokens": [0] * mock_tokens(body["content"])}).encode())
                 return
             ns.seen["body"] = body
+            ns.seen["bodies"].append(body)
+            if not body.get("stream"):         # the action router: one JSON answer
+                reply = ns.json_reply(body) if callable(ns.json_reply) else ns.json_reply
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(json.dumps(reply).encode())
+                return
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
             self.end_headers()

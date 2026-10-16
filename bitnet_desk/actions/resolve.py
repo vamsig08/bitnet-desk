@@ -86,6 +86,9 @@ def find_path(text):
         p = Path(raw).expanduser()
     else:
         raise ActionError(f"“{text}” isn't a path I can open.")
+    m = re.match(r"/Users/([^/]+)/(.+)", str(p))
+    if not p.exists() and m and not Path("/Users", m.group(1)).exists():
+        p = Path.home() / m.group(2)          # "/Users/username/Documents" (the model's placeholder)
     if not p.exists():
         raise ActionError(f"{tilde(p)} doesn't exist.")
     return p

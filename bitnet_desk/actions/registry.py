@@ -64,6 +64,7 @@ class Tool:
     plan: Callable = field(repr=False)   # args -> Plan, or raise ActionError
     example: str = ""           # for the system prompt: 'open an app ("open Safari")'
     run: Callable = field(default=None, repr=False)   # (plan, runner, progress) -> Result; default runs commands
+    optional: tuple = ()        # argument names the model may leave out
 
     def make_plan(self, args):
         plan = self.plan(args)

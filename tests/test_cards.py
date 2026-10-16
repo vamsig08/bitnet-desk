@@ -57,3 +57,25 @@ def test_card_widget_buttons(fake_mac):
         assert any("Notes.app" in t for t in texts)
     finally:
         root.destroy()
+
+
+def test_model_cards_offer_just_chat_and_explain_guesses(fake_mac):
+    tk = pytest.importorskip("tkinter")
+    try:
+        root = tk.Tk()
+    except tk.TclError:
+        pytest.skip("no display")
+    root.withdraw()
+    try:
+        plan = TOOLS["open_app"].make_plan({"name": "Spotify"})
+        proposal = Proposal("play some tunes", "model", plan, confidence=0.91, must_ask=True)
+        card = cards.card_for(proposal)
+        assert "guessed what you meant" in card.source and "91%" in card.source
+        chats = []
+        frame, *_ = cards.build_card(root, card, lambda: None, lambda: None, on_chat=lambda: chats.append(1))
+        buttons = [w for w in frame.winfo_children()[-2].winfo_children() if isinstance(w, tk.Button)]
+        just = next(b for b in buttons if b.cget("text") == "Just chat")
+        just.invoke()
+        assert chats == [1]
+    finally:
+        root.destroy()

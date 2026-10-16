@@ -109,7 +109,7 @@ register(Tool("find_files", "find", "search the user's files by name (Spotlight)
               {"query": {"type": "string", "maxLength": 80},
                "kind": {"type": "string", "enum": ["pdf", "folder", "image"]}},
               Risk.READ_ONLY, _find_plan, 'find files ("find files named invoice", "where\'s my resume")',
-              run=_find_run))
+              run=_find_run, optional=("kind",)))
 register(Tool("run_shell", "shell", "run a shell command the user typed literally",
               {"command": {"type": "string", "maxLength": 300}}, Risk.SHELL, _shell_plan,
               'run a shell command you type, always with your OK ("run `git status`")', run=_shell_run))

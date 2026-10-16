@@ -14,6 +14,7 @@ from ..registry import Plan, Result, Risk, Tool, register
 from ..resolve import download_name, normalise_url, tilde, unique_path
 
 CHUNK = 256 * 1024
+URL_ARG = {"type": "string", "maxLength": 300, "pattern": '^[^ "]+$'}   # the model wrote "x. org" without it
 
 
 def _open_url(args):
@@ -73,8 +74,8 @@ def _download_run(plan, runner, progress):
     return Result(True, msg, items=(str(dest),))
 
 
-register(Tool("open_url", "url", "open a web page the user named", {"url": {"type": "string", "maxLength": 300}},
+register(Tool("open_url", "url", "open a web page the user named", {"url": URL_ARG},
               Risk.NETWORK, _open_url, 'open a web page ("open github.com")'))
 register(Tool("download", "download", "download a file from a URL the user gave into ~/Downloads",
-              {"url": {"type": "string", "maxLength": 300}}, Risk.NETWORK, _download_plan,
+              {"url": URL_ARG}, Risk.NETWORK, _download_plan,
               'download a file to Downloads ("download https://…")', run=_download_run))

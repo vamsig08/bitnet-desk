@@ -40,6 +40,7 @@ def test_server_cmd_is_cpu_only_and_local(tmp_path, monkeypatch, reload_config):
     new = server.server_cmd(_fake_server(tmp_path, "-dev,  --device <dev1,..>   (none = don't offload)"))
     assert new[new.index("-ngl") + 1] == "0" and new[new.index("--host") + 1] == "127.0.0.1"
     assert new[new.index("-m") + 1] == "/m.gguf"
+    assert new[new.index("-np") + 1] == "2" and new[new.index("-c") + 1] == str(2 * config.CTX)
     assert new[-2:] == ["--device", "none"]
     old = server.server_cmd(_fake_server(tmp_path, "-ngl N  number of layers"))   # bitnet.cpp's server
     assert "--device" not in old and old[old.index("-ngl") + 1] == "0"

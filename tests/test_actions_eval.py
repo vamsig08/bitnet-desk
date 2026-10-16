@@ -27,3 +27,13 @@ def test_fast_path_eval(fake_mac):
     assert score.precision == 1.0 and not score.false_triggers, score.report()
     assert score.coverage == 1.0, score.report()       # every route=fast case for tools built so far
     assert score.in_scope > 0
+
+
+def test_command_verb_check_eval(fake_mac):
+    rows = evalkit.score_verb_check(evalkit.load_cases())
+    wrong = [(c["id"], c["text"], sent) for c, sent, ok in rows if not ok]
+    assert rows and not wrong
+    # traps on both sides of the check
+    sent = {c["id"]: s for c, s, _ in rows}
+    assert sent[32] == "model" and sent[33] == "model" and sent[49] == "model"   # verb, but not a command
+    assert sent[36] == "chat" and sent[37] == "chat" and sent[47] == "chat"      # command word, no verb first
