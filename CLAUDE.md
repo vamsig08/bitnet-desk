@@ -48,8 +48,9 @@ BitNet/          upstream microsoft/BitNet clone + model weights (git-ignored, b
   `"stream": true` (SSE lines `data: {...}`; `stop: true` on the final event, which carries `timings`).
 - Chat format (no chat template applied by us server-side):
   `System: …<|eot_id|>User: …<|eot_id|>Assistant: ` and stop on `<|eot_id|>`, `<|end_of_text|>`.
-- Context default 4096 tokens; `fit_history` trims oldest turns using a ~3 chars/token estimate.
-  Replace it with real token counts via the server's `/tokenize` endpoint when convenient.
+- Context default 4096 tokens; `fit_history` trims oldest turns so prompt + `MAX_NEW_TOKENS` fits,
+  counting with the server's `POST /tokenize` (`{"content": …}` → `{"tokens": […]}`, no BOS added,
+  special tokens parsed) and falling back to a ~3 chars/token estimate if the server can't answer.
 - Threads: default is half the logical cores; on Apple Silicon, performance-core count is usually best.
 
 ## macOS setup gotchas

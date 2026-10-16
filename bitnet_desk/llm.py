@@ -2,6 +2,7 @@
 
 All model access goes through this module so the model can be swapped by config.
 """
+import functools
 import json
 import urllib.request
 from datetime import datetime
@@ -16,7 +17,7 @@ def build_prompt(system, history):
     """BitNet b1.58 2B4T chat format. The server adds <|begin_of_text|> itself."""
     parts = [f"System: {system}<|eot_id|>"]
     for role, text in history:
-        parts.append(f"{'User' if role == 'user' else 'Assistant'}: {text}<|eot_id|>")
+        parts.append(_turn(role, text))
     parts.append("Assistant: ")
     return "".join(parts)
 
@@ -39,15 +40,68 @@ def prepare(history):
     return fitted, build_prompt(system, fitted)
 
 
+def estimate_tokens(text):
+    """Rough count (~3 chars/token) for when the server can't tokenize."""
+    return len(text) // 3 + 1
+
+
+@functools.lru_cache(maxsize=1024)
+def _server_tokens(base, text):
+    body = json.dumps({"content": text}).encode()
+    req = urllib.request.Request(base + "/tokenize", data=body,
+                                 headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=5) as r:
+        return len(json.load(r)["tokens"])
+
+
+def count_tokens(text):
+    """Token count from the server's /tokenize; falls back to an estimate if it can't answer."""
+    try:
+        return _server_tokens(cfg.BASE, text)
+    except Exception:
+        return estimate_tokens(text)
+
+
+def _counter():
+    """A count_tokens that stops asking the server after its first failure."""
+    failed = False
+
+    def count(text):
+        nonlocal failed
+        if not failed:
+            try:
+                return _server_tokens(cfg.BASE, text)
+            except Exception:
+                failed = True
+        return estimate_tokens(text)
+    return count
+
+
+def _turn(role, text):
+    return f"{'User' if role == 'user' else 'Assistant'}: {text}<|eot_id|>"
+
+
 def fit_history(system, history):
-    """Drop the oldest turns until the prompt fits the context window."""
-    limit = cfg.MAX_PROMPT_CHARS
+    """Drop the oldest turns until the prompt plus a full reply fits the context window.
+
+    Pieces are counted separately (each ends in a special token, so the sum matches the whole);
+    +1 for the <|begin_of_text|> the server adds.
+    """
+    count = _counter()
+    budget = cfg.CTX - cfg.MAX_NEW_TOKENS
+    fixed = 1 + count(build_prompt(system, []))
     h = list(history)
-    while len(h) > 1 and len(build_prompt(system, h)) > limit:
+    sizes = [count(_turn(r, t)) for r, t in h]
+    while len(h) > 1 and fixed + sum(sizes) > budget:
         h.pop(0)
-    if h and len(build_prompt(system, h)) > limit:   # one huge message
+        sizes.pop(0)
+    if h and fixed + sizes[-1] > budget:                  # one huge message: keep its end
         role, text = h[-1]
-        h[-1] = (role, text[-limit // 2:])
+        room = budget - fixed - count(_turn(role, ""))
+        keep = int(len(text) * room / sizes[-1])
+        while keep > 0 and fixed + count(_turn(role, text[-keep:])) > budget:
+            keep = int(keep * 0.9)
+        h[-1] = (role, text[-keep:] if keep > 0 else "")
     return h
 
 

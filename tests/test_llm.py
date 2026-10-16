@@ -19,6 +19,10 @@ def _free_port():
         return s.getsockname()[1]
 
 
+def mock_tokens(text):
+    return -(-len(text) // 4)
+
+
 @pytest.fixture()
 def mock_server():
     port = _free_port()
@@ -34,7 +38,14 @@ def mock_server():
             self.wfile.write(b'{"status":"ok"}')
 
         def do_POST(self):
-            seen["body"] = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            if self.path == "/tokenize":        # mock tokenizer: one token per 4 chars
+                seen["tokenize_calls"] = seen.get("tokenize_calls", 0) + 1
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(json.dumps({"tokens": [0] * mock_tokens(body["content"])}).encode())
+                return
+            seen["body"] = body
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
             self.end_headers()
@@ -78,14 +89,42 @@ def test_server_binds_localhost_only():
     assert a.HOST == "127.0.0.1"
 
 
-def test_history_trimming_keeps_latest_and_fits():
-    a = load_app(_free_port())
-    history = [("user", "x" * 5000), ("assistant", "y" * 5000)] * 3 + [("user", "latest")]
-    fitted = a.fit_history("sys", history)
+def _prompt_tokens(count, system, history):
+    return 1 + count(llm.build_prompt(system, history))
+
+
+def test_count_tokens_uses_server_tokenizer(mock_server):
+    port, seen = mock_server
+    load_app(port)
+    assert llm.count_tokens("x" * 40) == 10              # mock: 4 chars/token, not the 3-char estimate
+    assert llm.count_tokens("x" * 40) == 10 and seen["tokenize_calls"] == 1   # cached
+
+
+def test_count_tokens_falls_back_to_estimate_when_server_down():
+    load_app(_free_port())
+    assert llm.count_tokens("x" * 30) == llm.estimate_tokens("x" * 30) == 11
+
+
+@pytest.mark.parametrize("use_server", [True, False])
+def test_history_trimming_keeps_latest_and_fits(request, use_server):
+    port = request.getfixturevalue("mock_server")[0] if use_server else _free_port()
+    load_app(port)
+    count = (lambda t: mock_tokens(t)) if use_server else llm.estimate_tokens
+    budget = config.CTX - config.MAX_NEW_TOKENS
+    history = [("user", "x" * 3000), ("assistant", "y" * 3000)] * 3 + [("user", "latest")]
+    fitted = llm.fit_history("sys", history)
     assert fitted[-1] == ("user", "latest")
-    assert len(a.build_prompt("sys", fitted)) <= a.MAX_PROMPT_CHARS
-    huge = a.fit_history("sys", [("user", "z" * 50000)])
-    assert len(a.build_prompt("sys", huge)) <= a.MAX_PROMPT_CHARS
+    assert _prompt_tokens(count, "sys", fitted) <= budget
+    assert 2 < len(fitted) < len(history)                 # trimmed, but the budget is used
+    huge = llm.fit_history("sys", [("user", "a" * 25000 + "TAIL")])
+    assert huge[0][1].endswith("TAIL")
+    assert budget - 50 <= _prompt_tokens(count, "sys", huge) <= budget
+
+
+def test_short_history_is_untouched(mock_server):
+    load_app(mock_server[0])
+    history = [("user", "hi"), ("assistant", "hello"), ("user", "how are you?")]
+    assert llm.fit_history("sys", history) == history
 
 
 def _fake_server(tmp_path, help_text):

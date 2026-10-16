@@ -21,6 +21,5 @@ SYSTEM_PROMPT = os.environ.get("BITNET_SYSTEM", (
     "You are a helpful, concise assistant running entirely offline on the user's computer. "
     "Answer clearly. If you are not sure about a fact, say so instead of guessing."))
 
-MAX_PROMPT_CHARS = CTX * 3 - MAX_NEW_TOKENS * 4   # rough chars/token budget, leaves room to reply
 MAX_FILE_CHARS = 6000
 SERVER_LOG = HERE / "server.log"
