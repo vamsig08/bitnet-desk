@@ -16,7 +16,7 @@ Each phase ends with something usable. Tick boxes as items land; keep the log at
 
 ## Phase 1 — Solid foundation
 - [x] Split `assistant.py` into the `bitnet_desk/` package (config, server, llm, ui, app) with no behaviour change
-- [x] Current local date, time and weekday in the system prompt, computed on every request
+- [x] Current local date and weekday in the system prompt, local time on the newest message only — computed on every request, never stored in history
 - [ ] `tests/conftest.py` mock llama-server fixture; tests for prompt format, streaming, stop, context fitting
 - [x] Real token counting via `/tokenize` instead of the chars/3 estimate
 - [x] Config file at `~/Library/Application Support/BitNetDesk/config.toml` (threads, ctx, temp, system prompt)
@@ -79,3 +79,4 @@ Each phase ends with something usable. Tick boxes as items land; keep the log at
 - 2026-10-16: System prompt now ends with the current local date, time and weekday, computed per request (`llm.prepare`). Note: changes the prompt prefix each minute, so long chats lose llama-server's prompt cache (~20 s re-eval at 2k tokens on M1).
 - 2026-10-16: `fit_history` counts real tokens via `/tokenize` (cached per turn, chars/3 fallback); budget is `CTX − MAX_NEW_TOKENS`. Per-turn sums match whole-prompt counts on the real server.
 - 2026-10-16: `config.toml` support (threads, ctx, max_tokens, temperature, system_prompt) via stdlib `tomllib`; env vars override it; bad lines are skipped and shown in the chat window.
+- 2026-10-16: Time moved from the system prompt to the newest user message (prompt only, not saved history); system prompt keeps date + weekday. Old turns stay byte-identical, so a follow-up a minute later re-evaluates 44 tokens (0.5 s) instead of ~2k (20 s) on M1.

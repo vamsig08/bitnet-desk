@@ -27,17 +27,35 @@ def _now():
 
 
 def system_prompt(now=None):
-    """The configured system prompt plus the current local date, time and weekday."""
+    """The configured system prompt plus today's date and weekday (changes once a day)."""
     now = now or _now()
-    stamp = f"{now:%A}, {now.day} {now:%B} {now.year}, {now:%H:%M} {now:%Z}".rstrip()
-    return f"{cfg.SYSTEM_PROMPT}\nCurrent local date and time: {stamp}."
+    return f"{cfg.SYSTEM_PROMPT}\nToday is {now:%A}, {now.day} {now:%B} {now.year}."
+
+
+def time_note(now=None):
+    """Appended to the newest user message only, so older turns (and the server's cache) don't change."""
+    now = now or _now()
+    return f"\n\n(Local time: {f'{now:%H:%M} {now:%Z}'.rstrip()})"
 
 
 def prepare(history):
-    """Fit the history and build the prompt, with the date and time computed fresh."""
-    system = system_prompt()
-    fitted = fit_history(system, history)
-    return fitted, build_prompt(system, fitted)
+    """Fit the history and build the prompt; date and time are computed fresh on every call.
+
+    Returns (fitted history without the time note, prompt). The note goes on the newest user turn
+    in the prompt only, never into the stored history.
+    """
+    now = _now()
+    system = system_prompt(now)
+    h = list(history)
+    note = time_note(now) if h and h[-1][0] == "user" else ""
+    if note:
+        h[-1] = (h[-1][0], h[-1][1] + note)
+    fitted = fit_history(system, h)
+    prompt = build_prompt(system, fitted)
+    if note:
+        role, text = fitted[-1]
+        fitted[-1] = (role, text[:-len(note)] if text.endswith(note) else text)
+    return fitted, prompt
 
 
 def estimate_tokens(text):

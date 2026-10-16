@@ -176,23 +176,52 @@ def test_entry_points_import():
     assert assistant.main is app.main and callable(ui.run_app)
 
 
-def test_system_prompt_has_local_date_time_and_weekday():
+def test_system_prompt_has_date_and_weekday_but_not_time():
     a = load_app(_free_port())
     now = datetime(2026, 10, 16, 9, 5, tzinfo=timezone(timedelta(hours=1), "BST"))
-    sp = a.system_prompt(now)
-    assert sp.startswith(config.SYSTEM_PROMPT)
-    assert sp.endswith("\nCurrent local date and time: Friday, 16 October 2026, 09:05 BST.")
+    assert a.system_prompt(now) == config.SYSTEM_PROMPT + "\nToday is Friday, 16 October 2026."
+    assert a.time_note(now) == "\n\n(Local time: 09:05 BST)"
 
 
-def test_prepare_computes_time_fresh_on_every_call(monkeypatch):
+def _clock(monkeypatch, *times):
+    it = iter(times)
+    monkeypatch.setattr(llm, "_now", lambda: next(it))
+
+
+def test_time_goes_on_newest_message_only_and_not_into_history(monkeypatch):
     load_app(_free_port())
-    times = iter([datetime(2026, 10, 16, 23, 59), datetime(2026, 10, 17, 0, 1)])
-    monkeypatch.setattr(llm, "_now", lambda: next(times))
-    _, first = llm.prepare([("user", "hi")])
-    _, second = llm.prepare([("user", "hi")])
-    assert "Friday, 16 October 2026, 23:59" in first
-    assert "Saturday, 17 October 2026, 00:01" in second
-    assert second.endswith("User: hi<|eot_id|>Assistant: ")
+    _clock(monkeypatch, datetime(2026, 10, 16, 23, 59), datetime(2026, 10, 17, 0, 1))
+    history = [("user", "hi"), ("assistant", "hello"), ("user", "what time is it?")]
+    fitted, first = llm.prepare(history)
+    assert "Today is Friday, 16 October 2026." in first
+    assert first.endswith("User: what time is it?\n\n(Local time: 23:59)<|eot_id|>Assistant: ")
+    assert first.count("Local time") == 1
+    assert fitted == history                              # stored history stays clean
+    _, second = llm.prepare(history)                      # fresh on every call
+    assert "Today is Saturday, 17 October 2026." in second and "(Local time: 00:01)" in second
+
+
+def test_cached_prefix_is_identical_between_sends_a_minute_apart(monkeypatch):
+    load_app(_free_port())
+    _clock(monkeypatch, datetime(2026, 10, 16, 9, 0), datetime(2026, 10, 16, 9, 1))
+    history = [("user", "hi"), ("assistant", "hello")] * 3 + [("user", "first question")]
+    history, first = llm.prepare(history)
+    history += [("assistant", "an answer"), ("user", "follow-up")]
+    _, second = llm.prepare(history)
+    # Everything before the message the first send stamped is byte-identical in the second send,
+    # so llama-server's cache_prompt can reuse it.
+    old_turns = first[:first.rindex("User: first question")]
+    assert second.startswith(old_turns)
+    assert "first question<|eot_id|>" in second           # unstamped once it is no longer newest
+    assert second.count("Local time") == 1 and "(Local time: 09:01)" in second
+
+
+def test_time_note_survives_trimming_of_a_huge_message(monkeypatch):
+    load_app(_free_port())
+    _clock(monkeypatch, datetime(2026, 10, 16, 9, 0))
+    fitted, prompt = llm.prepare([("user", "a" * 25000 + "TAIL")])
+    assert prompt.endswith("TAIL\n\n(Local time: 09:00)<|eot_id|>Assistant: ")
+    assert fitted[0][1].endswith("TAIL")
 
 
 def _write_config(tmp_path, monkeypatch, text):
@@ -213,7 +242,7 @@ system_prompt = "You are terse."
     load_app(_free_port())
     assert (config.THREADS, config.CTX, config.MAX_NEW_TOKENS) == (3, 2048, 256)
     assert config.TEMPERATURE == 1.0 and isinstance(config.TEMPERATURE, float)
-    assert llm.system_prompt().startswith("You are terse.\nCurrent local date and time:")
+    assert llm.system_prompt().startswith("You are terse.\nToday is ")
     assert config.CONFIG_ERRORS == []
 
 
