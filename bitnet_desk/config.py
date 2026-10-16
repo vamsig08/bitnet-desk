@@ -27,11 +27,28 @@ FILE_KEYS = {
     "system_prompt": ("BITNET_SYSTEM", str, lambda v: bool(v.strip())),
 }
 
-# keys of the [actions] table -> (type, check)
+def _text(v):
+    return isinstance(v, str) and bool(v.strip())
+
+
+def _text_list(v):
+    return isinstance(v, list) and all(_text(x) for x in v)
+
+
+def _app_or_off(v):
+    return v is False or _text(v)
+
+
+# keys of the [actions] table -> check
 ACTION_KEYS = {
-    "auto_approve": (list, lambda v: all(isinstance(x, str) for x in v)),
-    "log": (bool, lambda v: True),
+    "auto_approve": _text_list,
+    "log": lambda v: isinstance(v, bool),
+    "editor": _text,                    # app that start_project opens the folder in
+    "terminal": _app_or_off,            # terminal app for start_project, or false for none
+    "download_max_mb": lambda v: isinstance(v, int) and not isinstance(v, bool) and v > 0,
 }
+# keys of a [projects.<name>] table -> check
+PROJECT_KEYS = {"path": _text, "aliases": _text_list, "editor": _text, "terminal": _app_or_off}
 DEFAULT_AUTO_APPROVE = ("open_app", "open_path", "now")
 
 
@@ -56,6 +73,9 @@ def load_file(path):
         if key == "aliases" and isinstance(value, dict):
             settings["aliases"] = _load_aliases(path, value, errors)
             continue
+        if key == "projects" and isinstance(value, dict):
+            settings["projects"] = _load_projects(path, value, errors)
+            continue
         if key not in FILE_KEYS:
             errors.append(f"{path}: unknown setting '{key}' — ignored")
             continue
@@ -75,11 +95,29 @@ def _load_actions(path, table, errors):
         if key not in ACTION_KEYS:
             errors.append(f"{path}: unknown setting 'actions.{key}' — ignored")
             continue
-        typ, ok = ACTION_KEYS[key]
-        if type(value) is not typ or not ok(value):
+        if not ACTION_KEYS[key](value):
             errors.append(f"{path}: invalid value for 'actions.{key}': {value!r} — ignored")
             continue
         out[key] = value
+    return out
+
+
+def _load_projects(path, table, errors):
+    """[projects.web] path = "~/code/web" … → {"web": {"path": …}}; a project needs a path."""
+    out = {}
+    for name, proj in table.items():
+        if not isinstance(proj, dict) or not _text(proj.get("path")):
+            errors.append(f"{path}: project '{name}' needs a path — ignored")
+            continue
+        clean = {}
+        for key, value in proj.items():
+            if key not in PROJECT_KEYS:
+                errors.append(f"{path}: unknown setting 'projects.{name}.{key}' — ignored")
+            elif not PROJECT_KEYS[key](value):
+                errors.append(f"{path}: invalid value for 'projects.{name}.{key}': {value!r} — ignored")
+            else:
+                clean[key] = value
+        out[name] = clean
     return out
 
 
@@ -141,6 +179,10 @@ AUTO_APPROVE = tuple(_ACTIONS.get("auto_approve", DEFAULT_AUTO_APPROVE))
 ACTION_LOG_ENABLED = _ACTIONS.get("log", True)
 ACTION_LOG = Path(os.environ.get("BITNET_ACTION_LOG") or CONFIG_PATH.parent / "actions.jsonl")
 APP_ALIASES = _FILE.get("aliases", {}).get("apps", {})
+EDITOR = _ACTIONS.get("editor", "Visual Studio Code")
+TERMINAL = _ACTIONS.get("terminal", "Terminal")
+DOWNLOAD_MAX_MB = _ACTIONS.get("download_max_mb", 2048)
+PROJECTS = _FILE.get("projects", {})
 # Where installed apps are looked up (one folder level deep, e.g. /Applications/Utilities).
 APP_DIRS = tuple(os.environ["BITNET_APP_DIRS"].split(os.pathsep) if os.environ.get("BITNET_APP_DIRS")
                  else ("/Applications", "/System/Applications", "~/Applications"))

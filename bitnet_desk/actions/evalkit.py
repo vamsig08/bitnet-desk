@@ -31,7 +31,11 @@ def fake_mac(root):
         (root / "Applications" / f"{app}.app").mkdir(parents=True, exist_ok=True)
     for d in FIXTURE_DIRS:
         (root / "home" / d).mkdir(parents=True, exist_ok=True)
-    return {"HOME": str(root / "home"), "BITNET_APP_DIRS": str(root / "Applications")}
+    config = root / "config.toml"
+    config.write_text('[projects.bitnet-desk]\npath = "~/Projects/bitnet-desk"\n'
+                      'aliases = ["bitnet desk", "bitnet"]\n', encoding="utf-8")
+    return {"HOME": str(root / "home"), "BITNET_APP_DIRS": str(root / "Applications"),
+            "BITNET_CONFIG": str(config)}
 
 
 def _norm(v):

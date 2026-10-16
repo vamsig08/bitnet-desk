@@ -39,9 +39,11 @@ class Plan:
     commands: tuple = ()        # argv tuples — shown to the user and executed verbatim
     done: str = ""              # message after success, e.g. "Opened Spotify."
     answer: str = ""            # read-only tools that answer directly (e.g. the time)
+    cwd: str = ""               # working directory for commands ("" = inherit)
+    shown: tuple = ()           # what the card shows when there are no commands (e.g. a download)
 
     def shown_commands(self):
-        return [shlex.join(argv) for argv in self.commands]
+        return list(self.shown) or [shlex.join(argv) for argv in self.commands]
 
 
 @dataclass(frozen=True)
@@ -49,6 +51,7 @@ class Result:
     ok: bool
     message: str
     output: str = ""
+    items: tuple = ()           # paths the UI can offer to open (find_files)
 
 
 @dataclass(frozen=True)
@@ -60,6 +63,7 @@ class Tool:
     risk: Risk                  # base risk
     plan: Callable = field(repr=False)   # args -> Plan, or raise ActionError
     example: str = ""           # for the system prompt: 'open an app ("open Safari")'
+    run: Callable = field(default=None, repr=False)   # (plan, runner, progress) -> Result; default runs commands
 
     def make_plan(self, args):
         plan = self.plan(args)

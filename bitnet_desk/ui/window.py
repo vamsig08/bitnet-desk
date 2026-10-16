@@ -40,6 +40,7 @@ def run_app():
             self.chat.tag_config("note", foreground="#888888", font=("Helvetica", 10, "italic"))
             self.chat.tag_config("ok", foreground="#2d6a2d")
             self.chat.tag_config("fail", foreground="#b00020")
+            self.links = 0
 
             self.attach_lbl = tk.Label(root, text="", fg="#555", anchor="w")
             self.attach_lbl.pack(fill="x", padx=10)
@@ -165,9 +166,38 @@ def run_app():
                 self.write(result.message + "\n\n")
                 return
             self.write(cards.outcome_line(result) + "\n", "ok" if result.ok else "fail")
-            if result.output:
+            if result.items:
+                self.write_items(result.items)
+            elif result.output:
                 self.write(result.output + "\n", "note")
             self.write("\n")
+
+        def write_items(self, paths):
+            """Clickable paths; a click opens it through the permission gate like any other action."""
+            from ..actions.resolve import tilde
+            for path in paths:
+                self.links += 1
+                tag = f"link{self.links}"
+                self.chat.tag_config(tag, foreground="#1f4e8c", underline=True)
+                self.chat.tag_bind(tag, "<Button-1>", lambda e, p=path: self.open_item(p))
+                self.chat.tag_bind(tag, "<Enter>", lambda e: self.chat.config(cursor="pointinghand"))
+                self.chat.tag_bind(tag, "<Leave>", lambda e: self.chat.config(cursor=""))
+                self.write("  " + tilde(path), tag)
+                self.write("\n")
+
+        def open_item(self, path):
+            try:
+                plan = actions.TOOLS["open_path"].make_plan({"path": path})
+            except actions.ActionError as e:
+                self.write(f"✗ {e.message}\n\n", "fail")
+                return
+            proposal = permissions.Proposal(f"open {path}", "click", plan)
+            if self.pending:
+                self.resolve_card(False, "Skipped — nothing was run.")
+            if permissions.needs_approval(plan):
+                self.show_card(proposal)
+            else:
+                self.show_result(plan, permissions.run(proposal))
 
         def show_card(self, proposal):
             frame, run_btn, deny_btn, status = cards.build_card(
@@ -197,7 +227,8 @@ def run_app():
 
             def work():
                 try:
-                    result = permissions.run(proposal, approved=True)
+                    result = permissions.run(proposal, approved=True,
+                                             progress=lambda text: self.q.put(("progress", (status, text))))
                 except Exception as e:
                     result = actions.Result(False, f"Couldn't run it: {e}")
                 self.q.put(("action", (status, result)))
@@ -268,7 +299,8 @@ def run_app():
                         self.ready = True
                         self.status.config(text=f"Ready · BitNet b1.58 2B4T · CPU · {cfg.THREADS} threads · "
                                                 f"localhost only")
-                        self.write("Model loaded locally. Nothing you type leaves this computer.\n\n", "note")
+                        self.write("Model loaded locally. The model never sends anything you type anywhere; only actions "
+                                   "you approve (like a download) use the network.\n\n", "note")
                     elif kind == "fatal":
                         self.status.config(text="Model failed to start")
                         messagebox.showerror("BitNet Desk", val)
@@ -277,9 +309,18 @@ def run_app():
                         self.write(val)
                     elif kind in ("done", "err"):
                         self.finish(kind, val)
+                    elif kind == "progress":
+                        status, text = val
+                        try:
+                            status.config(text=text)
+                        except tk.TclError:
+                            pass
                     elif kind == "action":
                         status, result = val
                         text = cards.outcome_line(result) + (f"\n{result.output}" if result.output else "")
+                        if result.items:
+                            self.write_items(result.items)
+                            self.write("\n")
                         try:
                             status.config(text=text, fg="#2d6a2d" if result.ok else "#b00020")
                         except tk.TclError:        # card was cleared meanwhile; the log has it

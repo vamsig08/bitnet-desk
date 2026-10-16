@@ -2,7 +2,7 @@
 
 A small desktop chat app that runs **Microsoft's BitNet b1.58 2B4T** — a natively 1.58-bit
 (ternary: −1, 0, +1) LLM — on your **CPU only**, via the official `bitnet.cpp` runtime.
-The model server listens on `127.0.0.1` only; nothing you type leaves your machine.
+The model server listens on `127.0.0.1` only, and the model never sends anything you type anywhere. The only network traffic is an action you asked for and approved, such as a download.
 
 ```
 ┌──────────────┐  HTTP (localhost)  ┌──────────────────────────────┐
@@ -55,6 +55,11 @@ Type a command in the chat box and it happens right away, without asking the mod
 | `open my downloads folder`, `open ~/Documents` | opens the folder in Finder |
 | `what time is it`, `what's the date today`, `is it friday yet?` | answers from your Mac's clock (never the model) |
 | `what can you do?`, `help` | lists the commands |
+| `find files named invoice`, `where's my resume?` | searches your home folder (Spotlight); click a result to open it |
+| `start project myapp` | opens the project folder in VS Code and a Terminal there (projects are set up in the settings file) |
+| `open github.com`, `go to https://…` | opens the page in your browser — **asks first** |
+| `download https://…/file.pdf` | saves it to ~/Downloads, never overwriting — **asks first** |
+| `` run `git status` `` or `$ git status` | runs exactly that command in your home folder — **always asks** |
 
 Polite versions work too ("can you open Calculator for me?"). These work even while the model is
 still loading. Anything else goes to the chat as usual.
@@ -89,9 +94,20 @@ Actions have their own sections in the same file:
 auto_approve = ["open_app", "open_path", "now"]   # the default; [] makes everything ask
 log = true                                        # false turns off the action log
 
+editor = "Visual Studio Code"                      # what "start project" opens the folder in
+terminal = "Terminal"                             # or "iTerm"; false for no terminal
+download_max_mb = 2048
+
 [aliases.apps]
 "music" = "Spotify"      # "open music" opens Spotify
+
+[projects.myapp]
+path = "~/code/myapp"
+aliases = ["my app"]     # "start my app" works too
+# editor = "Xcode"       # optional, per project
 ```
+Shell commands are never written by the model: only a command you type in backticks, quotes, or
+after `$ ` is run, and only after you approve it.
 
 Restart the app after editing it (reading the file needs Python 3.11+). If a line has a mistake, the app ignores that line and says so
 in the chat window. On Windows the file goes in `%APPDATA%\BitNetDesk\`; on Linux in
@@ -115,8 +131,11 @@ Example: `BITNET_THREADS=8 BITNET_SYSTEM="You are my terse coding buddy." python
 
 ## Privacy notes
 - The server binds to `127.0.0.1`, so other devices on your network can't reach it.
-- The app makes no network calls besides `localhost`. After setup, you can block the
-  BitNet folder in your firewall or set `HF_HUB_OFFLINE=1` to be extra sure.
+- The model never sends your data anywhere. The app's only network traffic besides `localhost`
+  is an action you asked for and approved (opening a web page, a download); the action log records
+  each one.
+- After setup, the model server itself never needs the network: you can block `llama-server` in
+  your firewall or set `HF_HUB_OFFLINE=1` to be extra sure.
 - Conversations live only in memory unless you click **Save…**. `server.log` contains
   server diagnostics, not your messages' content beyond what llama-server logs by default.
 

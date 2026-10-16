@@ -44,14 +44,21 @@ def needs_approval(plan):
     return not (plan.risk == Risk.CHANGES and plan.tool in auto_approved())
 
 
-def run(proposal, approved=False, runner=subprocess.run):
-    """Execute the plan exactly as shown. Raises PermissionError if it needs an approval it didn't get."""
+def run(proposal, approved=False, runner=subprocess.run, progress=None):
+    """Execute the plan exactly as shown. Raises PermissionError if it needs an approval it didn't get.
+
+    `progress(text)` is called from long-running tools (downloads) with a status line.
+    """
     plan = proposal.plan
     ask = needs_approval(plan)
     if ask and not approved:
         raise PermissionError(f"{plan.tool} needs the user's approval")
     t0 = time.monotonic()
-    result = _execute(plan, runner)
+    tool = TOOLS[plan.tool]
+    try:
+        result = tool.run(plan, runner, progress) if tool.run else run_commands(plan, runner)
+    except Exception as e:                       # a tool bug is a failed action, not a crash
+        result = Result(False, f"{plan.summary} failed: {e}")
     log.record(proposal.text, proposal.route, plan, "approved" if ask else "auto", result,
                ms=round((time.monotonic() - t0) * 1000), confidence=proposal.confidence)
     return result
@@ -66,10 +73,11 @@ def refuse(text, route, tool, args, error):
     log.record(text, route, None, "refused", tool=tool, args=args, error=error)
 
 
-def _execute(plan, runner):
+def run_commands(plan, runner, timeout=COMMAND_TIMEOUT):
     for argv in plan.commands:
         try:
-            proc = runner(list(argv), capture_output=True, text=True, timeout=COMMAND_TIMEOUT)
+            proc = runner(list(argv), capture_output=True, text=True, timeout=timeout,
+                          stdin=subprocess.DEVNULL, cwd=plan.cwd or None)
         except (OSError, subprocess.SubprocessError) as e:
             return Result(False, f"Couldn't run {argv[0]}: {e}")
         if proc.returncode != 0:

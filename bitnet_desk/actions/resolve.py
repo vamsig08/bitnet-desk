@@ -1,7 +1,10 @@
 """Turn names the user typed into real things on this Mac (apps, folders, files) — or refuse."""
 import difflib
 import os
+import re
+import shutil
 from pathlib import Path
+from urllib.parse import unquote, urlsplit
 
 from .. import config as cfg
 from .registry import ActionError, Risk
@@ -102,3 +105,92 @@ def tilde(p):
     except ValueError:
         return str(p)
     return "~" if rel == Path(".") else f"~/{rel}"
+
+
+# -- projects
+
+def _project_key(text):
+    return re.sub(r"[\s_-]+", "-", text.strip().lower())
+
+
+def find_project(name):
+    """(name, settings) of the configured project called `name` (or one of its aliases)."""
+    key = _project_key(name)
+    for pname, proj in cfg.PROJECTS.items():
+        if key in {_project_key(pname)} | {_project_key(a) for a in proj.get("aliases", [])}:
+            return pname, proj
+    names = list(cfg.PROJECTS)
+    if not names:
+        raise ActionError("No projects are set up yet. Add one to config.toml, e.g. "
+                          '[projects.myapp] with path = "~/code/myapp".')
+    close = difflib.get_close_matches(key, [_project_key(n) for n in names], n=3, cutoff=0.6)
+    raise ActionError(f"There's no project called “{name}”. Your projects: {', '.join(names)}.",
+                      [n for n in names if _project_key(n) in close])
+
+
+def editor_command(editor, folder):
+    """`open -a <editor app> <folder>`; VS Code's `code` CLI only if the app itself isn't found."""
+    try:
+        return ("open", "-a", str(find_app(editor)), str(folder))
+    except ActionError:
+        code = shutil.which("code")
+        if code and _key(editor) in ("visual studio code", "vs code", "vscode", "code"):
+            return (code, str(folder))
+        raise
+
+
+# -- web addresses
+
+# Things that look like domains but are file names ("notes.txt" is not a website).
+FILE_EXTENSIONS = {"txt", "md", "pdf", "py", "js", "ts", "json", "csv", "doc", "docx", "xls", "xlsx",
+                   "ppt", "pptx", "png", "jpg", "jpeg", "gif", "heic", "zip", "dmg", "pkg", "app", "sh",
+                   "html", "htm", "log", "toml", "yaml", "yml", "rtf", "pages", "key", "numbers", "mov",
+                   "mp3", "mp4", "wav", "c", "h", "cpp", "rs", "go", "java", "swift", "command"}
+DOMAIN = re.compile(r"(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+([a-z]{2,})(?::\d+)?(?:[/?#]\S*)?", re.I)
+SCHEME = re.compile(r"[a-z][a-z0-9+.-]*:", re.I)
+
+
+def looks_like_url(text):
+    t = text.strip().strip("<>\"'“”")
+    if re.match(r"https?://", t, re.I):
+        return True
+    m = DOMAIN.fullmatch(t)
+    return bool(m) and m.group(1).lower() not in FILE_EXTENSIONS
+
+
+def normalise_url(text):
+    """An http(s) URL, with https:// added to bare domains; anything else is refused."""
+    t = text.strip().strip("<>\"'“”")
+    if any(c.isspace() for c in t):
+        raise ActionError(f"“{text}” isn't a web address.")
+    if not re.match(r"https?://", t, re.I):
+        if SCHEME.match(t) and not DOMAIN.fullmatch(t):
+            raise ActionError("Only http and https web addresses can be opened.")
+        if not looks_like_url(t):
+            raise ActionError(f"“{text}” isn't a web address.")
+        t = "https://" + t
+    parts = urlsplit(t)
+    if parts.scheme.lower() not in ("http", "https") or not parts.hostname:
+        raise ActionError(f"“{text}” isn't a web address.")
+    if parts.username or parts.password:
+        raise ActionError("I don't open web addresses with a user name or password in them "
+                          "(a common phishing trick).")
+    return t
+
+
+def download_name(url):
+    """A safe file name from the URL's path ('report.pdf'), or 'download'."""
+    name = Path(unquote(urlsplit(url).path)).name
+    name = re.sub(r"[\x00-\x1f/:\\]", "_", name).lstrip(".").strip()
+    return name[:200] or "download"
+
+
+def unique_path(p):
+    """p, or 'name (1).ext', 'name (2).ext', … — never an existing file."""
+    p = Path(p)
+    n = 1
+    candidate = p
+    while candidate.exists() or candidate.with_name(candidate.name + ".part").exists():
+        candidate = p.with_name(f"{p.stem} ({n}){p.suffix}")
+        n += 1
+    return candidate

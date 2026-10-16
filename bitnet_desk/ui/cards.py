@@ -8,7 +8,7 @@ RISK_COLOURS = {Risk.READ_ONLY: "#666666", Risk.CHANGES: "#1f4e8c", Risk.NETWORK
                 Risk.SHELL: "#b00020"}
 RISK_NOTES = {Risk.NETWORK: "This uses the network.",
               Risk.SHELL: "This runs code with your user's permissions."}
-SOURCES = {"fast": "Matched a built-in command (no model).",
+SOURCES = {"fast": "Matched a built-in command (no model).", "click": "You clicked this path.",
            "model": "Suggested by the model — check it before running."}
 APPROVE_KEY, APPROVE_EVENTS = (("⌘↩", ("<Command-Return>",)) if sys.platform == "darwin"
                                else ("Ctrl+↩", ("<Control-Return>",)))

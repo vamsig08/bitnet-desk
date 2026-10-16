@@ -147,7 +147,7 @@ Rules:
 |---|---|---|---|---|
 | `help` | – | read-only | answer built from the tool registry | Added after the try-out: the model invented abilities when asked "what can you do?". |
 | `now` | – | read-only | Python `datetime` | Answers "what time/day is it" without the model making it up. |
-| `find_files` | `query`, `kind?` (pdf/folder/image/…) | read-only | `mdfind -onlyin ~ -name <q>` (+ content query fallback) | Top 20 shown as clickable rows; clicking one goes through `open_path` (and its gate). |
+| `find_files` | `query`, `kind?` (pdf/folder/image/…) | read-only | `mdfind -onlyin ~ -name <q>` (+ content query fallback) | Top 20 shown as clickable rows; clicking one goes through `open_path` (and its gate). If Spotlight returns nothing (index off/excluded — the case on the dev Mac), a 3-second name search of ~ (skipping Library, hidden folders, node_modules). |
 | `open_app` | `name` | changes | `open -a <resolved .app path>` | Name resolved against installed apps (`/Applications`, `/System/Applications`, `…/Utilities`, `~/Applications`) + aliases in config; fuzzy match with stdlib `difflib`. Unknown app → error with suggestions, never a guess. |
 | `open_path` (file/folder) | `path` | changes (→ shell for executables) | `open <path>` / `open -R` to reveal | Path must exist after `~` expansion. Names like "Downloads", "Desktop" map to known folders. |
 | `open_url` | `url` | network | `open <url>` | `https://` and `http://` only (no `file:`, `javascript:`, custom schemes). Bare domains get `https://`. Grounded (see §5). |
