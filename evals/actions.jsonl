@@ -1,0 +1,40 @@
+{"id": 1, "text": "open Safari", "tool": "open_app", "args": {"name": "Safari"}, "route": "fast"}
+{"id": 2, "text": "open spotify", "tool": "open_app", "args": {"name": "Spotify"}, "route": "fast"}
+{"id": 3, "text": "launch Visual Studio Code", "tool": "open_app", "args": {"name": "Visual Studio Code"}, "route": "fast"}
+{"id": 4, "text": "open vs code", "tool": "open_app", "args": {"name": "Visual Studio Code"}, "route": "fast"}
+{"id": 5, "text": "please open notes", "tool": "open_app", "args": {"name": "Notes"}, "route": "fast"}
+{"id": 6, "text": "open github.com", "tool": "open_url", "args": {"url": "https://github.com"}, "route": "fast"}
+{"id": 7, "text": "open https://news.ycombinator.com", "tool": "open_url", "args": {"url": "https://news.ycombinator.com"}, "route": "fast"}
+{"id": 8, "text": "open ~/Documents", "tool": "open_path", "args": {"path": "~/Documents"}, "route": "fast"}
+{"id": 9, "text": "open my downloads folder", "tool": "open_path", "args": {"path": "~/Downloads"}, "route": "fast"}
+{"id": 10, "text": "start project bitnet-desk", "tool": "start_project", "args": {"name": "bitnet-desk"}, "route": "fast"}
+{"id": 11, "text": "work on bitnet desk", "tool": "start_project", "args": {"name": "bitnet-desk"}, "route": "fast"}
+{"id": 12, "text": "open the bitnet-desk project", "tool": "start_project", "args": {"name": "bitnet-desk"}, "route": "fast"}
+{"id": 13, "text": "download https://example.com/report.pdf", "tool": "download", "args": {"url": "https://example.com/report.pdf"}, "route": "fast"}
+{"id": 14, "text": "save https://example.com/a.zip to downloads", "tool": "download", "args": {"url": "https://example.com/a.zip"}, "route": "fast"}
+{"id": 15, "text": "find files named invoice", "tool": "find_files", "args": {"query": "invoice"}, "route": "fast"}
+{"id": 16, "text": "where's my resume?", "tool": "find_files", "args": {"query": {"contains": "resume"}}, "route": "fast"}
+{"id": 17, "text": "what time is it", "tool": "now", "args": {}, "route": "fast"}
+{"id": 18, "text": "what's the date today?", "tool": "now", "args": {}, "route": "fast"}
+{"id": 19, "text": "run `git status`", "tool": "run_shell", "args": {"command": "git status"}, "route": "fast"}
+{"id": 20, "text": "$ ls -la ~/Desktop", "tool": "run_shell", "args": {"command": "ls -la ~/Desktop"}, "route": "fast"}
+{"id": 21, "text": "play some music", "tool": "open_app", "args": {"name": {"any_of": ["Music", "Spotify"]}}, "route": "model"}
+{"id": 22, "text": "launch the terminal for me", "tool": "open_app", "args": {"name": "Terminal"}, "route": "model"}
+{"id": 23, "text": "show me what's on my desktop", "tool": "open_path", "args": {"path": "~/Desktop"}, "route": "model"}
+{"id": 24, "text": "start up my bitnet thing", "tool": "start_project", "args": {"name": "bitnet-desk"}, "route": "model"}
+{"id": 25, "text": "download the csv at https://x.org/data.csv", "tool": "download", "args": {"url": "https://x.org/data.csv"}, "route": "model"}
+{"id": 26, "text": "find the PDFs about taxes I made last year", "tool": "find_files", "args": {"query": {"contains": "tax"}}, "route": "model"}
+{"id": 27, "text": "open the report I wrote about Q3", "tool": "find_files", "args": {"query": {"contains": "q3"}}, "route": "model"}
+{"id": 28, "text": "show me the weather in Paris", "tool": "chat", "args": {}, "route": "model", "note": "no URL given; must not invent one"}
+{"id": 29, "text": "download the latest python installer", "tool": "chat", "args": {}, "route": "model", "note": "no URL; must not invent"}
+{"id": 30, "text": "run a check of my disk space", "tool": "chat", "args": {}, "route": "model", "note": "no literal command; no model-written shell"}
+{"id": 31, "text": "start project moonbase", "tool": "chat", "args": {}, "route": "model", "note": "unknown project: no action"}
+{"id": 32, "text": "find me a good pancake recipe", "tool": "chat", "args": {}, "route": "model", "note": "passes verb check; model must say chat"}
+{"id": 33, "text": "start thinking about a name for my cat", "tool": "chat", "args": {}, "route": "model", "note": "passes verb check"}
+{"id": 34, "text": "show me how recursion works in Python", "tool": "chat", "args": {}, "route": "model", "note": "passes verb check"}
+{"id": 35, "text": "play devil's advocate: is remote work good?", "tool": "chat", "args": {}, "route": "model", "note": "passes verb check"}
+{"id": 36, "text": "how do I download a file with curl?", "tool": "chat", "args": {}, "route": "chat", "note": "verb check sends to chat"}
+{"id": 37, "text": "what does \"open a can of worms\" mean?", "tool": "chat", "args": {}, "route": "chat", "note": "verb check sends to chat"}
+{"id": 38, "text": "write a haiku about autumn", "tool": "chat", "args": {}, "route": "chat"}
+{"id": 39, "text": "what is the capital of France", "tool": "chat", "args": {}, "route": "chat"}
+{"id": 40, "text": "is it friday yet?", "tool": "now", "args": {}, "route": "chat", "note": "known gate miss: no command verb"}

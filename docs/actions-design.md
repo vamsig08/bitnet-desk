@@ -94,7 +94,7 @@ actions/
   resolve.py      shared arg resolution + grounding (apps, paths, projects, URLs)
   permissions.py  the gate: decide auto-run vs approval; run approved plans
   log.py          append-only JSONL action log + reader
-  eval.py         python -m bitnet_desk.actions.eval
+  eval.py         python -m bitnet_desk.actions eval
   tools/          one module per tool
 ```
 
@@ -289,7 +289,7 @@ measured when this lands and recorded in `docs/benchmarks.md`.
 ```
 
 Logged: auto-runs, approvals, denials, failures and refusals (grounding failures). Viewer: an
-"Action log" window (newest first, filter by decision) plus `python -m bitnet_desk.actions.log` to
+"Action log" window (newest first, filter by decision) plus `python -m bitnet_desk.actions log` to
 print the last N entries in the terminal.
 
 ---
@@ -339,7 +339,7 @@ never states them as certain.
 2. *Command-verb check* (deterministic, pytest): for every case the fast path doesn't take, does the
    check send it to the model or to chat as `route` says? Trap phrases on both sides.
 3. *Model path* (all 40 cases sent to the router **ignoring** fast path and verb check, to measure the
-   2B model itself; `python -m bitnet_desk.actions.eval`, needs the real server, not in pytest):
+   2B model itself; `python -m bitnet_desk.actions eval`, needs the real server, not in pytest):
    - tool accuracy, args accuracy (given right tool), `chat` accuracy (no false actions)
    - grounding catches (model invented a value and §5 rejected it — safe, reported apart)
    - calibration: accuracy per `p_tool` bucket → pick the "unsure" threshold
@@ -408,7 +408,7 @@ per-case diffs. The set grows with every new tool; a tool doesn't ship without c
 ## 9. Build order (each step small, tested, one commit)
 
 1. **Permission system + action log + fast path** with `open_app`, `open_path`, `now`: `Risk`, `Tool`,
-   `Plan`, the gate with `auto_approve`, JSONL log + `python -m bitnet_desk.actions.log`,
+   `Plan`, the gate with `auto_approve`, JSONL log + `python -m bitnet_desk.actions log`,
    `[actions]`/`[aliases]` config, eval file + fast-path scoring in pytest. Tests use a fake runner;
    nothing is launched for real.
 2. **Approval card in the UI**; chat box routes through the fast path. → *stop here for a try-out

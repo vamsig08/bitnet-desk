@@ -40,6 +40,8 @@ def isolated_settings(tmp_path, monkeypatch, reload_config):
     for env in ("BITNET_SERVER", "BITNET_MODEL", "BITNET_DIR"):
         monkeypatch.delenv(env, raising=False)
     monkeypatch.setenv("BITNET_PORT", str(free_port()))   # nothing listens here
+    monkeypatch.setenv("BITNET_ACTION_LOG", str(tmp_path / "actions.jsonl"))
+    monkeypatch.setenv("BITNET_APP_DIRS", str(tmp_path / "no-apps"))   # never scan the real /Applications
     reload_config()
     yield
     monkeypatch.undo()
@@ -89,3 +91,25 @@ def mock_server(monkeypatch, reload_config):
     yield ns
     srv.shutdown()
     srv.server_close()
+
+
+@pytest.fixture()
+def fake_mac(tmp_path, monkeypatch, reload_config):
+    """The action eval's fake Mac: a few apps, a home folder with Documents/Downloads/Desktop."""
+    from bitnet_desk.actions import evalkit
+    for key, value in evalkit.fake_mac(tmp_path / "mac").items():
+        monkeypatch.setenv(key, value)
+    reload_config()
+    return tmp_path / "mac"
+
+
+@pytest.fixture()
+def runner():
+    """Stands in for subprocess.run: records argv lists, launches nothing. Set .returncode to fail."""
+    calls = []
+
+    def run(argv, **kwargs):
+        calls.append(argv)
+        return SimpleNamespace(returncode=run.returncode, stdout="", stderr=run.stderr)
+    run.calls, run.returncode, run.stderr = calls, 0, ""
+    return run

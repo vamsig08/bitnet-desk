@@ -25,14 +25,14 @@ Each phase ends with something usable. Tick boxes as items land; keep the log at
 - [x] Config file at `~/Library/Application Support/BitNetDesk/config.toml` (threads, ctx, temp, system prompt)
 
 ## Phase 2 — Actions (next) — design: `docs/actions-design.md`
-- [ ] Action core: tool registry with risk levels (read-only / changes / network / shell), frozen `Plan` objects, permission gate
+- [x] Action core: tool registry with risk levels (read-only / changes / network / shell), frozen `Plan` objects, permission gate — with `[actions] auto_approve`, JSONL log + `python -m bitnet_desk.actions log`
 - [ ] Approval card in the chat window showing the exact command; nothing non-read-only runs without a click
 - [ ] Action log (local JSONL) + a window to review it
 - [ ] Tools: current date/time, find files (`mdfind`), open app, open file/folder, open URL, start project (`[projects]` in config.toml), download to ~/Downloads, run shell command
 - [ ] Fast path: rule-based matching for common commands, no model call
 - [ ] Model path: model picks one tool + JSON args under the server's `json_schema` grammar; confidence from token probabilities; grounding checks on arguments
 - [ ] Failure handling: unsure / no tool / bad arguments / server down (see design)
-- [ ] Action eval (~40 commands): fast path scored in pytest, model path by `python -m bitnet_desk.actions.eval` → `docs/evals.md`
+- [ ] Action eval (~40 commands): fast path scored in pytest, model path by `python -m bitnet_desk.actions eval` → `docs/evals.md`
 
 **Done when:** "open Safari", "start project bitnet-desk", "download https://…", "find my resume" and
 "what time is it" all work from one chat box; non-read-only actions wait for one approval click; the
@@ -99,3 +99,4 @@ action log shows everything; eval numbers are recorded.
 - 2026-10-16: Time moved from the system prompt to the newest user message (prompt only, not saved history); system prompt keeps date + weekday. Old turns stay byte-identical, so a follow-up a minute later re-evaluates 44 tokens (0.5 s) instead of ~2k (20 s) on M1.
 - 2026-10-16: Mock llama-server (/health, /tokenize, streaming /completion) and settings isolation moved to `tests/conftest.py`; tests split into test_llm/test_server/test_config; added a Stop-mid-stream test.
 - 2026-10-16: Priorities changed: Actions (one permission system, fast path + model router) is now Phase 2, ahead of RAG and UI polish; privacy rule reworded to "model never sends data; only approved actions use the network". Design in `docs/actions-design.md`. Checked pinned server: `json_schema`, `grammar` and `n_probs` all work on `/completion`.
+- 2026-10-16: Actions step 1: `bitnet_desk/actions/` — risk levels, frozen plans, permission gate (`auto_approve`, default open_app/open_path/now; network/shell always ask), private JSONL action log, fast path for open app / open file-folder / date-time, 40-case `evals/actions.jsonl` with fast-path scoring in pytest (9/9, no false triggers). Not wired into the UI yet.
