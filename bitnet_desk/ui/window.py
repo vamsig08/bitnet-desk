@@ -114,8 +114,7 @@ def run_app():
             self.write(shown + "\n\n")
             self.write("Assistant: ", "bot")
 
-            self.history = llm.fit_history(cfg.SYSTEM_PROMPT, self.history)
-            prompt = llm.build_prompt(cfg.SYSTEM_PROMPT, self.history)
+            self.history, prompt = llm.prepare(self.history)
             self.busy, self.reply = True, ""
             self.stop_event.clear()
             self.send_btn.config(text="Stop")

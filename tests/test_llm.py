@@ -5,6 +5,7 @@ import json
 import os
 import socket
 import threading
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -122,3 +123,22 @@ def test_entry_points_import():
     import assistant
     from bitnet_desk import app, ui
     assert assistant.main is app.main and callable(ui.run_app)
+
+
+def test_system_prompt_has_local_date_time_and_weekday():
+    a = load_app(_free_port())
+    now = datetime(2026, 10, 16, 9, 5, tzinfo=timezone(timedelta(hours=1), "BST"))
+    sp = a.system_prompt(now)
+    assert sp.startswith(config.SYSTEM_PROMPT)
+    assert sp.endswith("\nCurrent local date and time: Friday, 16 October 2026, 09:05 BST.")
+
+
+def test_prepare_computes_time_fresh_on_every_call(monkeypatch):
+    load_app(_free_port())
+    times = iter([datetime(2026, 10, 16, 23, 59), datetime(2026, 10, 17, 0, 1)])
+    monkeypatch.setattr(llm, "_now", lambda: next(times))
+    _, first = llm.prepare([("user", "hi")])
+    _, second = llm.prepare([("user", "hi")])
+    assert "Friday, 16 October 2026, 23:59" in first
+    assert "Saturday, 17 October 2026, 00:01" in second
+    assert second.endswith("User: hi<|eot_id|>Assistant: ")

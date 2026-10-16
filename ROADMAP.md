@@ -16,6 +16,7 @@ Each phase ends with something usable. Tick boxes as items land; keep the log at
 
 ## Phase 1 — Solid foundation
 - [x] Split `assistant.py` into the `bitnet_desk/` package (config, server, llm, ui, app) with no behaviour change
+- [x] Current local date, time and weekday in the system prompt, computed on every request
 - [ ] `tests/conftest.py` mock llama-server fixture; tests for prompt format, streaming, stop, context fitting
 - [ ] Real token counting via `/tokenize` instead of the chars/3 estimate
 - [ ] Config file at `~/Library/Application Support/BitNetDesk/config.toml` (threads, ctx, temp, system prompt)
@@ -75,3 +76,4 @@ Each phase ends with something usable. Tick boxes as items land; keep the log at
 - 2026-10-15: Phase 0 on M1: setup.sh pins BitNet `1876a3e`, uses Homebrew clang, CPU-only CMake settings; `BITNET_SERVER` + auto `--device none` in assistant.py; baseline benchmarks. Model output still broken on Apple Silicon for both backends — findings in `docs/setup-notes.md`.
 - 2026-10-15: Fixed Apple Silicon output: pin BitNet `765741d` (pre-Nov-2025 i2_s layout matches the HF GGUF) with TL1 forced off; coherent replies at ~27 tok/s on M1. TQ2_0 looping confirmed not a prompt/stop-token issue. setup.sh cleans codegen files out of BitNet/.
 - 2026-10-16: Phase 1: split `assistant.py` into `bitnet_desk/` (config, server, llm, ui, app); run with `python3.12 -m bitnet_desk`, `assistant.py` kept as a launcher. No behaviour change.
+- 2026-10-16: System prompt now ends with the current local date, time and weekday, computed per request (`llm.prepare`). Note: changes the prompt prefix each minute, so long chats lose llama-server's prompt cache (~20 s re-eval at 2k tokens on M1).

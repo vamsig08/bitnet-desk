@@ -4,6 +4,7 @@ All model access goes through this module so the model can be swapped by config.
 """
 import json
 import urllib.request
+from datetime import datetime
 from pathlib import Path
 
 from . import config as cfg
@@ -18,6 +19,24 @@ def build_prompt(system, history):
         parts.append(f"{'User' if role == 'user' else 'Assistant'}: {text}<|eot_id|>")
     parts.append("Assistant: ")
     return "".join(parts)
+
+
+def _now():
+    return datetime.now().astimezone()
+
+
+def system_prompt(now=None):
+    """The configured system prompt plus the current local date, time and weekday."""
+    now = now or _now()
+    stamp = f"{now:%A}, {now.day} {now:%B} {now.year}, {now:%H:%M} {now:%Z}".rstrip()
+    return f"{cfg.SYSTEM_PROMPT}\nCurrent local date and time: {stamp}."
+
+
+def prepare(history):
+    """Fit the history and build the prompt, with the date and time computed fresh."""
+    system = system_prompt()
+    fitted = fit_history(system, history)
+    return fitted, build_prompt(system, fitted)
 
 
 def fit_history(system, history):
