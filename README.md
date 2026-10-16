@@ -6,7 +6,7 @@ The model server listens on `127.0.0.1` only; nothing you type leaves your machi
 
 ```
 ┌──────────────┐  HTTP (localhost)  ┌──────────────────────────────┐
-│ assistant.py │ ─────────────────▶ │ bitnet.cpp llama-server       │
+│ bitnet_desk/ │ ─────────────────▶ │ bitnet.cpp llama-server       │
 │ Tkinter UI   │ ◀── token stream ─ │ BitNet-b1.58-2B-4T i2_s GGUF  │
 └──────────────┘                    └──────────────────────────────┘
 ```
@@ -42,9 +42,9 @@ the ternary kernels plus `llama-server`.
 
 ## Run (fully offline from here on)
 ```bash
-python3 assistant.py
+python3.12 -m bitnet_desk
 ```
-First launch takes a few seconds while the model loads. You can now disconnect from the internet.
+(`python3.12 assistant.py` still works too.) First launch takes a few seconds while the model loads. You can now disconnect from the internet.
 
 ## Configuration (environment variables)
 | Variable | Default | Meaning |
@@ -58,7 +58,7 @@ First launch takes a few seconds while the model loads. You can now disconnect f
 | `BITNET_DIR` / `BITNET_MODEL` | `./BitNet/…` | custom install or model path |
 | `BITNET_SERVER` | bitnet.cpp's `llama-server` | another `llama-server` binary, e.g. Homebrew llama.cpp's for a TQ2_0 model |
 
-Example: `BITNET_THREADS=8 BITNET_SYSTEM="You are my terse coding buddy." python3 assistant.py`
+Example: `BITNET_THREADS=8 BITNET_SYSTEM="You are my terse coding buddy." python3.12 -m bitnet_desk`
 
 ## Privacy notes
 - The server binds to `127.0.0.1`, so other devices on your network can't reach it.

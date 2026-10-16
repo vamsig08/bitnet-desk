@@ -38,8 +38,7 @@ bitnet_desk/
 tests/           pytest; uses a mock llama-server, never the real model
 BitNet/          upstream microsoft/BitNet clone + model weights (git-ignored, built by setup.sh)
 ```
-Right now everything lives in the single file `assistant.py` (v0). Phase 1 splits it into the package
-above without changing behaviour.
+`config`, `server`, `llm`, `ui` and `app` exist; `assistant.py` is a thin launcher kept for compatibility.
 
 ## Key technical facts
 - Model file: `BitNet/models/BitNet-b1.58-2B-4T/ggml-model-i2_s.gguf` (from HF
@@ -66,10 +65,10 @@ above without changing behaviour.
 ## Commands
 ```bash
 ./setup.sh                      # one-time: clone, download model, build (needs internet)
-python3.12 assistant.py         # run v0 (after phase 1: python3 -m bitnet_desk)
+python3.12 -m bitnet_desk       # run the app (python3.12 assistant.py also works)
 python3.12 -m venv .venv && .venv/bin/pip install pytest   # one-time test setup
 .venv/bin/python -m pytest -q   # tests (mock server; no model needed)
-BITNET_THREADS=8 python3 assistant.py
+BITNET_THREADS=8 python3.12 -m bitnet_desk
 ```
 
 ## How to work in this repo

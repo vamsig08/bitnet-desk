@@ -15,7 +15,7 @@ Each phase ends with something usable. Tick boxes as items land; keep the log at
 **Done when:** you can chat with the model offline (Wi-Fi off). — everything above works; the Wi-Fi-off check is still to do by hand.
 
 ## Phase 1 — Solid foundation
-- [ ] Split `assistant.py` into the `bitnet_desk/` package (config, server, llm, ui, app) with no behaviour change
+- [x] Split `assistant.py` into the `bitnet_desk/` package (config, server, llm, ui, app) with no behaviour change
 - [ ] `tests/conftest.py` mock llama-server fixture; tests for prompt format, streaming, stop, context fitting
 - [ ] Real token counting via `/tokenize` instead of the chars/3 estimate
 - [ ] Config file at `~/Library/Application Support/BitNetDesk/config.toml` (threads, ctx, temp, system prompt)
@@ -74,3 +74,4 @@ Each phase ends with something usable. Tick boxes as items land; keep the log at
 - 2026-10-14: v0 created — single-file Tkinter app, setup scripts, README, CLAUDE.md, roadmap.
 - 2026-10-15: Phase 0 on M1: setup.sh pins BitNet `1876a3e`, uses Homebrew clang, CPU-only CMake settings; `BITNET_SERVER` + auto `--device none` in assistant.py; baseline benchmarks. Model output still broken on Apple Silicon for both backends — findings in `docs/setup-notes.md`.
 - 2026-10-15: Fixed Apple Silicon output: pin BitNet `765741d` (pre-Nov-2025 i2_s layout matches the HF GGUF) with TL1 forced off; coherent replies at ~27 tok/s on M1. TQ2_0 looping confirmed not a prompt/stop-token issue. setup.sh cleans codegen files out of BitNet/.
+- 2026-10-16: Phase 1: split `assistant.py` into `bitnet_desk/` (config, server, llm, ui, app); run with `python3.12 -m bitnet_desk`, `assistant.py` kept as a launcher. No behaviour change.

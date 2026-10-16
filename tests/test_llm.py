@@ -1,15 +1,15 @@
-"""Starter tests for v0's model plumbing. Uses a mock llama-server — no real model needed."""
+"""Tests for the model plumbing. Uses a mock llama-server — no real model needed."""
 import http.server
-import importlib.util
+import importlib
 import json
 import os
 import socket
 import threading
-from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[1]
+from bitnet_desk import config, llm, server
 
 
 def _free_port():
@@ -49,11 +49,11 @@ def mock_server():
 
 
 def load_app(port):
+    """Re-read config from the environment; server/llm look settings up at call time."""
     os.environ["BITNET_PORT"] = str(port)
-    spec = importlib.util.spec_from_file_location("assistant", ROOT / "assistant.py")
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
+    importlib.reload(config)
+    return SimpleNamespace(**{n: getattr(m, n) for m in (config, server, llm)
+                              for n in dir(m) if not n.startswith("_")})
 
 
 def test_prompt_format():
@@ -116,3 +116,9 @@ def test_server_cmd_is_cpu_only_and_local(tmp_path, monkeypatch):
     assert new[-2:] == ["--device", "none"]
     old = a.server_cmd(_fake_server(tmp_path, "-ngl N  number of layers"))   # bitnet.cpp's server
     assert "--device" not in old and old[old.index("-ngl") + 1] == "0"
+
+
+def test_entry_points_import():
+    import assistant
+    from bitnet_desk import app, ui
+    assert assistant.main is app.main and callable(ui.run_app)
