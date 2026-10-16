@@ -172,6 +172,8 @@ def run_app():
                         self.status.config(text=f"Ready · BitNet b1.58 2B4T · CPU · {cfg.THREADS} threads · "
                                                 f"localhost only")
                         self.write("Model loaded locally. Nothing you type leaves this computer.\n\n", "note")
+                        for err in cfg.CONFIG_ERRORS:
+                            self.write(f"Config: {err}\n\n", "note")
                     elif kind == "fatal":
                         self.status.config(text="Model failed to start")
                         messagebox.showerror("BitNet Desk", val)

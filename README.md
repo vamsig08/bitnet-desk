@@ -46,7 +46,23 @@ python3.12 -m bitnet_desk
 ```
 (`python3.12 assistant.py` still works too.) First launch takes a few seconds while the model loads. You can now disconnect from the internet.
 
-## Configuration (environment variables)
+## Configuration
+### Settings file
+Create `~/Library/Application Support/BitNetDesk/config.toml` (any of these lines are optional):
+```toml
+threads = 4             # ≈ performance-core count is usually fastest
+ctx = 4096              # context window (tokens)
+max_tokens = 768        # max reply length
+temperature = 0.6
+system_prompt = "You are my terse coding buddy."
+```
+Restart the app after editing it (reading the file needs Python 3.11+). If a line has a mistake, the app ignores that line and says so
+in the chat window. On Windows the file goes in `%APPDATA%\BitNetDesk\`; on Linux in
+`~/.config/bitnet-desk/`. Set `BITNET_CONFIG` to use a file somewhere else.
+
+### Environment variables
+These override the settings file.
+
 | Variable | Default | Meaning |
 |---|---|---|
 | `BITNET_THREADS` | half your logical cores | ≈ physical cores is usually fastest |
