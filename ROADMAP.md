@@ -26,7 +26,7 @@ Each phase ends with something usable. Tick boxes as items land; keep the log at
 
 ## Phase 2 — Actions (next) — design: `docs/actions-design.md`
 - [x] Action core: tool registry with risk levels (read-only / changes / network / shell), frozen `Plan` objects, permission gate — with `[actions] auto_approve`, JSONL log + `python -m bitnet_desk.actions log`
-- [ ] Approval card in the chat window showing the exact command; nothing non-read-only runs without a click
+- [x] Approval card in the chat window showing the exact command; nothing non-read-only runs without a click
 - [ ] Action log (local JSONL) + a window to review it
 - [ ] Tools: current date/time, find files (`mdfind`), open app, open file/folder, open URL, start project (`[projects]` in config.toml), download to ~/Downloads, run shell command
 - [ ] Fast path: rule-based matching for common commands, no model call
@@ -100,3 +100,4 @@ action log shows everything; eval numbers are recorded.
 - 2026-10-16: Mock llama-server (/health, /tokenize, streaming /completion) and settings isolation moved to `tests/conftest.py`; tests split into test_llm/test_server/test_config; added a Stop-mid-stream test.
 - 2026-10-16: Priorities changed: Actions (one permission system, fast path + model router) is now Phase 2, ahead of RAG and UI polish; privacy rule reworded to "model never sends data; only approved actions use the network". Design in `docs/actions-design.md`. Checked pinned server: `json_schema`, `grammar` and `n_probs` all work on `/completion`.
 - 2026-10-16: Actions step 1: `bitnet_desk/actions/` — risk levels, frozen plans, permission gate (`auto_approve`, default open_app/open_path/now; network/shell always ask), private JSONL action log, fast path for open app / open file-folder / date-time, 40-case `evals/actions.jsonl` with fast-path scoring in pytest (9/9, no false triggers). Not wired into the UI yet.
+- 2026-10-16: Actions step 2: chat box tries the fast path first (works while the model loads); auto-approved actions run and show a ✓/✗ line, others show an approval card with the exact command, risk badge and source — Run (⌘↩) / Deny (Esc); a new message or Clear denies an open card. README: Commands section.

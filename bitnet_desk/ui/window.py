@@ -4,8 +4,11 @@ import threading
 import time
 from pathlib import Path
 
+from .. import actions
 from .. import config as cfg
 from .. import llm, server
+from ..actions import permissions
+from . import cards
 
 
 def run_app():
@@ -21,7 +24,9 @@ def run_app():
             self.server_proc = None
             self.stop_event = threading.Event()
             self.busy = False
+            self.ready = False
             self.reply = ""
+            self.pending = None            # (proposal, run button, deny button, status label)
 
             root.title("BitNet Desk — private, offline")
             root.geometry("820x640")
@@ -33,6 +38,8 @@ def run_app():
             self.chat.tag_config("user", foreground="#1f4e8c", font=("Helvetica", 12, "bold"))
             self.chat.tag_config("bot", foreground="#2d6a2d", font=("Helvetica", 12, "bold"))
             self.chat.tag_config("note", foreground="#888888", font=("Helvetica", 10, "italic"))
+            self.chat.tag_config("ok", foreground="#2d6a2d")
+            self.chat.tag_config("fail", foreground="#b00020")
 
             self.attach_lbl = tk.Label(root, text="", fg="#555", anchor="w")
             self.attach_lbl.pack(fill="x", padx=10)
@@ -42,9 +49,13 @@ def run_app():
             self.entry = tk.Text(bottom, height=3, wrap="word", font=("Helvetica", 12))
             self.entry.pack(side="left", fill="x", expand=True)
             self.entry.bind("<Return>", self.on_enter)
+            for seq in cards.APPROVE_EVENTS:       # must beat the entry's own <Return> binding
+                self.entry.bind(seq, self.on_approve_key)
+                root.bind(seq, self.on_approve_key)
+            root.bind("<Escape>", self.on_deny_key)
             btns = tk.Frame(bottom)
             btns.pack(side="right", padx=(6, 0))
-            self.send_btn = tk.Button(btns, text="Send", width=8, command=self.send, state="disabled")
+            self.send_btn = tk.Button(btns, text="Send", width=8, command=self.send)
             self.send_btn.pack(fill="x")
             tk.Button(btns, text="Attach…", width=8, command=self.attach).pack(fill="x")
             tk.Button(btns, text="Clear", width=8, command=self.clear).pack(fill="x")
@@ -54,6 +65,8 @@ def run_app():
             self.status.pack(fill="x", padx=10, pady=(0, 6))
 
             root.protocol("WM_DELETE_WINDOW", self.on_close)
+            for err in cfg.CONFIG_ERRORS + permissions.config_problems():
+                self.write(f"Config: {err}\n\n", "note")
             threading.Thread(target=self.boot, daemon=True).start()
             self.root.after(30, self.poll)
             self.entry.focus_set()
@@ -99,7 +112,14 @@ def run_app():
                 self.stop_event.set()
                 return
             msg = self.entry.get("1.0", "end").strip()
-            if not msg or self.send_btn["state"] == "disabled":
+            if not msg:
+                return
+            if self.pending:                   # a new message skips the open card
+                self.resolve_card(False, "Skipped — nothing was run.")
+            if not self.attachment and self.try_action(msg):
+                return
+            if not self.ready:
+                self.write("The model is still loading — commands like “open Safari” already work.\n\n", "note")
                 return
             self.entry.delete("1.0", "end")
             shown = msg
@@ -120,6 +140,81 @@ def run_app():
             self.send_btn.config(text="Stop")
             self.status.config(text="Thinking…")
             threading.Thread(target=self.generate, args=(prompt,), daemon=True).start()
+
+        # -- actions (fast path; the permission gate decides what runs)
+        def try_action(self, msg):
+            try:
+                outcome = actions.handle(msg)
+            except Exception as e:             # an action bug must never break chat
+                self.write(f"[action error: {e}]\n\n", "note")
+                return False
+            if outcome.kind == "chat":
+                return False
+            self.entry.delete("1.0", "end")
+            self.write("You: ", "user")
+            self.write(msg + "\n\n")
+            if outcome.kind == "ask":
+                self.show_card(outcome.proposal)
+            else:
+                self.show_result(outcome.proposal.plan, outcome.result)
+            return True
+
+        def show_result(self, plan, result):
+            if result.ok and plan.answer:
+                self.write("Assistant: ", "bot")
+                self.write(result.message + "\n\n")
+                return
+            self.write(cards.outcome_line(result) + "\n", "ok" if result.ok else "fail")
+            if result.output:
+                self.write(result.output + "\n", "note")
+            self.write("\n")
+
+        def show_card(self, proposal):
+            frame, run_btn, deny_btn, status = cards.build_card(
+                self.chat, cards.card_for(proposal),
+                on_run=lambda: self.resolve_card(True), on_deny=lambda: self.resolve_card(False))
+            self.chat.configure(state="normal")
+            self.chat.window_create("end", window=frame)
+            self.chat.insert("end", "\n\n")
+            self.chat.configure(state="disabled")
+            self.chat.see("end")
+            self.pending = (proposal, run_btn, deny_btn, status)
+            self.status.config(text=f"Waiting for your approval — {cards.APPROVE_KEY} to run, Esc to deny")
+
+        def resolve_card(self, approved, denied_text="Denied — nothing was run."):
+            if not self.pending:
+                return
+            proposal, run_btn, deny_btn, status = self.pending
+            self.pending = None
+            run_btn.config(state="disabled")
+            deny_btn.config(state="disabled")
+            if not approved:
+                permissions.deny(proposal)
+                status.config(text=denied_text, fg="#888888")
+                self.status.config(text="Ready" if self.ready else "Starting local model…")
+                return
+            status.config(text="Running…", fg="#666666")
+
+            def work():
+                try:
+                    result = permissions.run(proposal, approved=True)
+                except Exception as e:
+                    result = actions.Result(False, f"Couldn't run it: {e}")
+                self.q.put(("action", (status, result)))
+            threading.Thread(target=work, daemon=True).start()
+
+        def on_approve_key(self, event):
+            if self.pending:
+                self.resolve_card(True)
+            else:
+                self.send()
+            return "break"
+
+        def on_deny_key(self, event):
+            if self.pending:
+                self.resolve_card(False)
+                return "break"
+            return None
 
         def generate(self, prompt):
             try:
@@ -148,6 +243,8 @@ def run_app():
         def clear(self):
             if self.busy:
                 return
+            if self.pending:
+                self.resolve_card(False)
             self.history.clear()
             self.chat.configure(state="normal")
             self.chat.delete("1.0", "end")
@@ -168,12 +265,10 @@ def run_app():
                 while True:
                     kind, val = self.q.get_nowait()
                     if kind == "ready":
-                        self.send_btn.config(state="normal")
+                        self.ready = True
                         self.status.config(text=f"Ready · BitNet b1.58 2B4T · CPU · {cfg.THREADS} threads · "
                                                 f"localhost only")
                         self.write("Model loaded locally. Nothing you type leaves this computer.\n\n", "note")
-                        for err in cfg.CONFIG_ERRORS:
-                            self.write(f"Config: {err}\n\n", "note")
                     elif kind == "fatal":
                         self.status.config(text="Model failed to start")
                         messagebox.showerror("BitNet Desk", val)
@@ -182,6 +277,14 @@ def run_app():
                         self.write(val)
                     elif kind in ("done", "err"):
                         self.finish(kind, val)
+                    elif kind == "action":
+                        status, result = val
+                        text = cards.outcome_line(result) + (f"\n{result.output}" if result.output else "")
+                        try:
+                            status.config(text=text, fg="#2d6a2d" if result.ok else "#b00020")
+                        except tk.TclError:        # card was cleared meanwhile; the log has it
+                            pass
+                        self.status.config(text="Ready" if self.ready else "Starting local model…")
             except queue.Empty:
                 pass
             self.root.after(30, self.poll)

@@ -60,3 +60,39 @@ def test_default_config_path_on_macos(monkeypatch):
     monkeypatch.setattr(config.sys, "platform", "darwin")
     assert config.default_config_path() == (
         Path.home() / "Library" / "Application Support" / "BitNetDesk" / "config.toml")
+
+
+def test_actions_and_aliases_tables(write_config):
+    write_config('''
+[actions]
+auto_approve = ["now"]
+log = false
+
+[aliases.apps]
+"VS  Code" = "Visual Studio Code"
+''')
+    assert config.AUTO_APPROVE == ("now",) and config.ACTION_LOG_ENABLED is False
+    assert config.APP_ALIASES == {"vs code": "Visual Studio Code"}
+    assert config.CONFIG_ERRORS == []
+
+
+def test_actions_defaults():
+    assert config.AUTO_APPROVE == ("open_app", "open_path", "now") and config.ACTION_LOG_ENABLED
+
+
+def test_bad_actions_settings_are_skipped(write_config):
+    write_config('''
+[actions]
+auto_approve = "open_app"
+colour = 1
+
+[aliases.apps]
+x = 3
+
+[aliases.files]
+y = "z"
+''')
+    assert config.AUTO_APPROVE == config.DEFAULT_AUTO_APPROVE
+    errs = " ".join(config.CONFIG_ERRORS)
+    assert "'actions.auto_approve'" in errs and "'actions.colour'" in errs
+    assert "'aliases.apps.x'" in errs and "'aliases.files'" in errs

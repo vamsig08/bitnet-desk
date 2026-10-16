@@ -46,6 +46,31 @@ python3.12 -m bitnet_desk
 ```
 (`python3.12 assistant.py` still works too.) First launch takes a few seconds while the model loads. You can now disconnect from the internet.
 
+## Commands
+Type a command in the chat box and it happens right away, without asking the model:
+
+| Type | What happens |
+|---|---|
+| `open Safari`, `launch Spotify`, `open vs code` | opens the app |
+| `open my downloads folder`, `open ~/Documents` | opens the folder in Finder |
+| `what time is it`, `what's the date today` | answers from your Mac's clock |
+
+These work even while the model is still loading. Anything else goes to the chat as usual.
+
+**Permissions.** Every action has a risk level: *read-only*, *changes things*, *network* or *shell*.
+Read-only actions just run. Opening apps and files/folders runs straight away too, because they're on
+the auto-approve list (you can change that, see below). Anything else shows a card with the exact
+command, and nothing runs until you click **Run** (or press ⌘↩). **Deny** (or Esc) cancels it. Opening
+something that runs code, like a `.command` script, always asks. Network and shell actions will
+always ask, whatever the settings say.
+
+**Action log.** Every action, including ones you denied, is written to
+`~/Library/Application Support/BitNetDesk/actions.jsonl` (only you can read it). To see the latest
+entries:
+```bash
+python3.12 -m bitnet_desk.actions log
+```
+
 ## Configuration
 ### Settings file
 Create `~/Library/Application Support/BitNetDesk/config.toml` (any of these lines are optional):
@@ -56,6 +81,16 @@ max_tokens = 768        # max reply length
 temperature = 0.6
 system_prompt = "You are my terse coding buddy."
 ```
+Actions have their own sections in the same file:
+```toml
+[actions]
+auto_approve = ["open_app", "open_path", "now"]   # the default; [] makes everything ask
+log = true                                        # false turns off the action log
+
+[aliases.apps]
+"music" = "Spotify"      # "open music" opens Spotify
+```
+
 Restart the app after editing it (reading the file needs Python 3.11+). If a line has a mistake, the app ignores that line and says so
 in the chat window. On Windows the file goes in `%APPDATA%\BitNetDesk\`; on Linux in
 `~/.config/bitnet-desk/`. Set `BITNET_CONFIG` to use a file somewhere else.
