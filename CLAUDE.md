@@ -42,8 +42,8 @@ bitnet_desk/
   llm.py         prompt formatting, streaming /completion client, context fitting
   actions/       (phase 2) tool registry, fast path, model router, permissions, action log, eval
                  — design in docs/actions-design.md
-  memory/        (phase 4) local index of user folders: chunking, CPU embeddings, SQLite store
-  ui/            Tkinter app (may move to a native wrapper in phase 7)
+  memory/        (phase 5) local index of user folders: chunking, CPU embeddings, SQLite store
+  ui/            Tkinter app (may move to a native wrapper in phase 8)
   app.py         entry point: python -m bitnet_desk
 tests/           pytest; uses a mock llama-server, never the real model
 BitNet/          upstream microsoft/BitNet clone + model weights (git-ignored, built by setup.sh)
