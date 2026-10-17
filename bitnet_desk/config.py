@@ -47,6 +47,10 @@ ACTION_KEYS = {
     "terminal": _app_or_off,            # terminal app for start_project, or false for none
     "download_max_mb": lambda v: isinstance(v, int) and not isinstance(v, bool) and v > 0,
 }
+# keys of the [ui] table -> check
+UI_KEYS = {
+    "hotkey": _app_or_off,              # "alt+space", "⌥Space", "cmd+shift+k" … or false for none
+}
 # keys of a [projects.<name>] table -> check
 PROJECT_KEYS = {"path": _text, "aliases": _text_list, "editor": _text, "terminal": _app_or_off}
 DEFAULT_AUTO_APPROVE = ("open_app", "open_path", "now")
@@ -68,7 +72,10 @@ def load_file(path):
     settings, errors = {}, []
     for key, value in data.items():
         if key == "actions" and isinstance(value, dict):
-            settings["actions"] = _load_actions(path, value, errors)
+            settings["actions"] = _load_table(path, "actions", value, ACTION_KEYS, errors)
+            continue
+        if key == "ui" and isinstance(value, dict):
+            settings["ui"] = _load_table(path, "ui", value, UI_KEYS, errors)
             continue
         if key == "aliases" and isinstance(value, dict):
             settings["aliases"] = _load_aliases(path, value, errors)
@@ -89,14 +96,14 @@ def load_file(path):
     return settings, errors
 
 
-def _load_actions(path, table, errors):
+def _load_table(path, name, table, checks, errors):
     out = {}
     for key, value in table.items():
-        if key not in ACTION_KEYS:
-            errors.append(f"{path}: unknown setting 'actions.{key}' — ignored")
+        if key not in checks:
+            errors.append(f"{path}: unknown setting '{name}.{key}' — ignored")
             continue
-        if not ACTION_KEYS[key](value):
-            errors.append(f"{path}: invalid value for 'actions.{key}': {value!r} — ignored")
+        if not checks[key](value):
+            errors.append(f"{path}: invalid value for '{name}.{key}': {value!r} — ignored")
             continue
         out[key] = value
     return out
@@ -191,6 +198,12 @@ PROJECTS = _FILE.get("projects", {})
 # Where installed apps are looked up (one folder level deep, e.g. /Applications/Utilities).
 APP_DIRS = tuple(os.environ["BITNET_APP_DIRS"].split(os.pathsep) if os.environ.get("BITNET_APP_DIRS")
                  else ("/Applications", "/System/Applications", "~/Applications"))
+
+# Always there (see docs/always-there-design.md)
+HOTKEY = os.environ.get("BITNET_HOTKEY") or _FILE.get("ui", {}).get("hotkey", "alt+space")
+APP_SUPPORT = CONFIG_PATH.parent
+LOCK_FILE = APP_SUPPORT / "app.lock"            # one copy of the app at a time
+LOGIN_LOG = APP_SUPPORT / "login.log"          # output of the copy started at login
 
 MAX_FILE_CHARS = 6000
 SERVER_LOG = HERE / "server.log"

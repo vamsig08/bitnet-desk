@@ -179,6 +179,26 @@ steps = ["start bitnet-desk", "play my focus playlist", "dnd on"]
   what runs.
 - **Eval cases:** routine triggers, an unknown routine, and the trap "what's my morning routine".
 
+## Changes made while building step 1
+
+- **Clashes aren't refused.** Two apps can register the same combination, and *both* get every press
+  (tested: two processes on ⌃⌥⌘F12, one press, both fired). So "taken" never happens for app clashes.
+  We check the likely ones ourselves: macOS's own shortcuts (`com.apple.symbolichotkeys`, with the
+  defaults for Spotlight, input sources and screenshots) and ChatGPT's launcher
+  (`com.openai.chat`). ⌥Space currently clashes with ChatGPT on the dev Mac, and the app says so at
+  startup and in the menu.
+- **The hotkey callback can't touch Tk.** It runs inside Tcl's event processing, and calling Tk from
+  there aborts Python ("PyEval_RestoreThread … GIL is released"). The callback puts a message on
+  the app's queue, which the 30 ms poll already drains.
+- **The box has a thin title bar.** On macOS, borderless Tk windows (`overrideredirect`, or
+  `-stylemask {}`) never get keyboard focus; only titled windows do. The box is a titled window with no
+  buttons and an empty title.
+- **Activation:** `[NSApp activate]` (macOS 14+) is called before `activateIgnoringOtherApps:`. The
+  older call alone didn't bring the box forward when System Settings was the front app.
+- **Giving focus back:** Esc reactivates the app you were in. After an auto action ("open Notes"),
+  the box only hands focus back if we're still in front 400 ms later. Otherwise the opened app keeps
+  it, and so does a box you've reopened in the meantime.
+
 ## Not in scope here
 
 Voice, "ask about selection", custom icons or themes for the box, and a Dock-less (menu-bar-only)

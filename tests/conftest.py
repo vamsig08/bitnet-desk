@@ -38,7 +38,7 @@ def isolated_settings(tmp_path, monkeypatch, reload_config):
     monkeypatch.setenv("BITNET_CONFIG", str(tmp_path / "no-config.toml"))
     for env, *_ in config.FILE_KEYS.values():
         monkeypatch.delenv(env, raising=False)
-    for env in ("BITNET_SERVER", "BITNET_MODEL", "BITNET_DIR"):
+    for env in ("BITNET_SERVER", "BITNET_MODEL", "BITNET_DIR", "BITNET_HOTKEY"):
         monkeypatch.delenv(env, raising=False)
     monkeypatch.setenv("BITNET_PORT", str(free_port()))   # nothing listens here
     monkeypatch.setenv("BITNET_ACTION_LOG", str(tmp_path / "actions.jsonl"))

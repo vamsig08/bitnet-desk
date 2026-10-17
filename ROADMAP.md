@@ -42,10 +42,10 @@ action log shows everything; eval numbers are recorded.
 
 ## Phase 3 — Reach for it all day (next) — design: `docs/always-there-design.md`
 Step 1 — always one keypress away (no macOS permissions needed):
-- [ ] Global hotkey (`[ui] hotkey`, default ⌥Space; clash detected and shown) toggles a compact command box from any app
-- [ ] Command box: same pipeline and permission gate as the window; auto actions hide it, cards and chat replies show in it; shares history with the main window
-- [ ] Menu-bar icon (show box, open window, launch at login, quit); closing the window hides it, the model server keeps running; single instance
-- [ ] Launch at login (LaunchAgent, `--background`), toggled from the menu or `--login on|off`
+- [x] Global hotkey (`[ui] hotkey`, default ⌥Space; clash detected and shown) toggles a compact command box from any app
+- [x] Command box: same pipeline and permission gate as the window; auto actions hide it, cards and chat replies show in it; shares history with the main window
+- [x] Menu-bar icon (show box, open window, launch at login, quit); closing the window hides it, the model server keeps running; single instance
+- [x] Launch at login (LaunchAgent, `--background`), toggled from the menu or `--login on|off`
 
 Step 2 — system and media tools (each with fast-path rules and eval cases):
 - [ ] Media: play/pause/next/previous for Spotify and Music; play a configured playlist
@@ -125,3 +125,4 @@ Do Not Disturb; "pause", "volume 20" and "lock my mac" work the same way; the ev
 - 2026-10-16: Actions step 4: model router (grammar-constrained JSON, per-message enums so URLs/commands/paths can only be copied; confidence from token probs, < 0.7 → chat), grounding (invented → chat, inferred → ask), command-verb check, `-np 2` (+356 MB footprint), "Just chat" on model cards, `python -m bitnet_desk.actions eval`. Results (`docs/evals.md`): fast path 39/39 with no false triggers; model path 55/65 (85%), tool choice 87%, args 82%; pipeline 60/65 (92%); 2 unsafe picks, both shown as cards (none auto-run).
 - 2026-10-16: "That was wrong" feedback: a ⚑ link under every reply/action and `/wrong [note]` save the message + what the app did to a private `misses.jsonl`; `python -m bitnet_desk.actions misses` asks for the right answer and appends eval cases (route worked out automatically). Projects bitnet-desk and tx-lead-engine added to the user's config; "start bitnet-desk" verified end to end. Spotlight on the dev Mac indexes only apps (findings in the session notes; nothing changed).
 - 2026-10-17: Priorities: new Phase 3 "Reach for it all day" — hotkey + command box + menu bar + launch at login, then system/media tools, then routines (design: `docs/always-there-design.md`; Carbon hotkey verified permission-free inside Tk). RAG and the rest shift down one phase.
+- 2026-10-17: Phase 3 step 1: ⌥Space (`[ui] hotkey`) toggles a command box from any app via Carbon `RegisterEventHotKey` (ctypes; no Accessibility/Input Monitoring); box and window share one conversation (`ui/transcript.py` views); auto actions hide the box, cards/answers/chat show in it. Menu-bar icon (Tk 9 `tk systray`), closing the window hides it, single-instance lock, `--background`, launch at login (LaunchAgent; `--login on|off|status`). macOS lets two apps hold one hotkey (both fire), so clashes with macOS shortcuts and ChatGPT's launcher are detected from their prefs and shown.

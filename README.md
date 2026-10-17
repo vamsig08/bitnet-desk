@@ -46,6 +46,41 @@ python3.12 -m bitnet_desk
 ```
 (`python3.12 assistant.py` still works too.) First launch takes a few seconds while the model loads. You can now disconnect from the internet.
 
+### From any app: ⌥Space
+Press **⌥Space** (Option-Space) anywhere and a small command box appears near the top of the
+screen. Type a command or a question and press Return:
+- **A command that runs by itself** ("open Safari"): it happens and the box gets out of the way.
+- **A command that needs approval:** the card shows up in the box. ⌘↩ runs it, Esc cancels it.
+- **Something to read** (the time, found files, a chat reply): the box stays open. **Open in window**
+  (⌘O) shows the full conversation.
+- **Esc** (or ⌥Space again) hides the box and puts you back where you were.
+
+The box and the main window share one conversation: what you do in the box shows up in the window
+too.
+
+There's also a **menu-bar icon** (a rounded square with three dots). Its menu has Show command box,
+Open window, Launch at login, and Quit. Closing the main window only hides it: the model stays loaded
+in the background, so ⌥Space answers instantly. To stop everything, use **Quit** in the menu (or ⌘Q).
+Only one copy runs at a time.
+
+**Launch at login:** tick it in the menu, or run `python3.12 -m bitnet_desk --login on` (`off`,
+`status`). It starts quietly in the background (menu bar and hotkey only) the next time you log in.
+macOS shows a one-time "Background item added" notice, and the item appears as *python3.12* in System
+Settings › General › Login Items. If you move this folder, turn it off and on again.
+`python3.12 -m bitnet_desk --background` starts that way by hand.
+
+**Permissions:** none, for the hotkey, the box and the menu bar. The hotkey uses the macOS API that
+reports only that one key combination, so the app never sees anything else you type (no
+Accessibility or Input Monitoring access needed).
+
+**Hotkey clashes:** macOS lets two apps use the same shortcut, and then both react. The app warns you
+(in the window and the menu) when ⌥Space is also a macOS shortcut or ChatGPT's launcher shortcut. To
+use a different combination, set it in the settings file:
+```toml
+[ui]
+hotkey = "ctrl+alt+space"     # or "⌃⌥Space", "cmd+shift+k", "f5"…; false for no hotkey
+```
+
 ## Commands
 Type a command in the chat box and it happens right away, without asking the model:
 

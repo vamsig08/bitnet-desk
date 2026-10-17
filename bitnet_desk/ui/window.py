@@ -1,4 +1,4 @@
-"""Tkinter desktop UI."""
+"""Tkinter desktop UI: the main window, the command box (global hotkey) and the menu-bar icon."""
 import queue
 import threading
 import time
@@ -6,12 +6,29 @@ from pathlib import Path
 
 from .. import actions
 from .. import config as cfg
-from .. import llm, server
+from .. import llm, login, server
 from ..actions import misses, permissions, pipeline
-from . import cards
+from . import cards, mac
+from .commandbox import CommandBox, hide_after
+from .menubar import MenuBar
+from .transcript import Tee, Transcript
 
 
-def run_app():
+def hotkey_setting():
+    """(HotKey or None, problem or None) from [ui] hotkey."""
+    if cfg.HOTKEY in (False, "", "off", "none", "false"):
+        return None, None
+    try:
+        return mac.parse_hotkey(cfg.HOTKEY), None
+    except ValueError as e:
+        return None, f"[ui] hotkey: {e} — no hotkey"
+
+
+def is_wrong(msg):
+    return msg.lower() == "/wrong" or msg.lower().startswith("/wrong ")
+
+
+def run_app(background=False):
     import tkinter as tk
     from tkinter import filedialog, messagebox, scrolledtext
 
@@ -26,7 +43,7 @@ def run_app():
             self.busy = False
             self.ready = False
             self.reply = ""
-            self.pending = None            # (proposal, run button, deny button, status label)
+            self.pending = None            # (proposal, run button, deny button, status label, view, from box)
 
             root.title("BitNet Desk — private, offline")
             root.geometry("820x640")
@@ -35,12 +52,9 @@ def run_app():
             self.chat = scrolledtext.ScrolledText(root, wrap="word", state="disabled",
                                                   font=("Helvetica", 12), padx=10, pady=8)
             self.chat.pack(fill="both", expand=True, padx=8, pady=(8, 4))
-            self.chat.tag_config("user", foreground="#1f4e8c", font=("Helvetica", 12, "bold"))
-            self.chat.tag_config("bot", foreground="#2d6a2d", font=("Helvetica", 12, "bold"))
-            self.chat.tag_config("note", foreground="#888888", font=("Helvetica", 10, "italic"))
-            self.chat.tag_config("ok", foreground="#2d6a2d")
-            self.chat.tag_config("fail", foreground="#b00020")
-            self.links = 0
+            self.main_view = Transcript(self.chat)
+            self.out = self.main_view      # where the current exchange is written
+            self.from_box = False          # …and whether it came from the command box
             self.last_miss = None          # (what the user typed, what the app did) for /wrong
             self.last_user_text = ""
 
@@ -67,12 +81,96 @@ def run_app():
             self.status = tk.Label(root, text="Starting local model…", anchor="w", fg="#666")
             self.status.pack(fill="x", padx=10, pady=(0, 6))
 
-            root.protocol("WM_DELETE_WINDOW", self.on_close)
             for err in cfg.CONFIG_ERRORS + permissions.config_problems():
                 self.write(f"Config: {err}\n\n", "note")
+            self.setup_always_there()
+            root.protocol("WM_DELETE_WINDOW", self.on_close)
             threading.Thread(target=self.boot, daemon=True).start()
             self.root.after(30, self.poll)
+            if background:
+                root.withdraw()
+            else:
+                self.entry.focus_set()
+
+        # -- hotkey, command box, menu bar
+        def setup_always_there(self):
+            hotkey, problem = hotkey_setting()
+            self.hotkey = None
+            label = hotkey.label if hotkey else "no hotkey"
+            self.box = CommandBox(self.root, on_submit=self.box_submit, on_approve=self.box_approve_key,
+                                  on_escape=self.box_escape, on_open_window=self.box_open_window,
+                                  approve_events=cards.APPROVE_EVENTS,
+                                  hint=f"{label} hides · {cards.APPROVE_KEY} runs a card · Esc closes")
+            warnings = [problem] if problem else []
+            if hotkey:
+                self.hotkey = mac.GlobalHotKey(hotkey, lambda: self.q.put(("hotkey", None)))   # no Tk calls in there
+                state = self.hotkey.register()
+                if state == "ok":
+                    others = mac.find_clashes(hotkey)
+                    if others:
+                        warnings.append(f"{hotkey.label} is also used by {', '.join(others)} — both will react. "
+                                        "Change that shortcut, or set [ui] hotkey in config.toml.")
+                elif state != "unsupported":
+                    warnings.append(f"Couldn't register {hotkey.label} ({state}) — set [ui] hotkey in config.toml.")
+                    self.hotkey = None
+                else:
+                    self.hotkey = None
+            self.login_var = tk.BooleanVar(value=login.is_enabled())
+            items = [(f"Show command box ({label})" if self.hotkey else "Show command box", self.box.show),
+                     ("Open window", self.show_window), None]
+            items += [("note", "⚠ " + w.split(" — ")[0]) for w in warnings]
+            items += [("check", "Launch at login", self.login_var, self.toggle_login), None,
+                      ("Quit BitNet Desk", self.quit)]
+            self.menubar = MenuBar(self.root, "BitNet Desk", items)
+            for w in warnings:
+                self.write(f"Hotkey: {w}\n\n", "note")
+            # macOS: ⌘Q / Dock › Quit, and a click on the Dock icon
+            self.root.createcommand("tk::mac::Quit", self.quit)
+            self.root.createcommand("tk::mac::ReopenApplication", self.show_window)
+
+        def show_window(self):
+            self.root.deiconify()
+            self.root.lift()
+            mac.activate()
             self.entry.focus_set()
+
+        def toggle_login(self):
+            try:
+                self.set_status(login.set_enabled(self.login_var.get()))
+            except OSError as e:
+                self.login_var.set(login.is_enabled())
+                self.set_status(f"Couldn't change launch at login: {e}")
+
+        def box_submit(self, msg):
+            if self.busy:
+                self.box.set_status("Still working on the last one — wait, or press Stop in the window.")
+                return False
+            if not is_wrong(msg):
+                self.skip_card()               # before clearing: the card lives in the box
+                self.box.view.clear()
+            return self.submit(msg, Tee(self.box.view, self.main_view), from_box=True)
+
+        def box_approve_key(self, event):
+            if self.pending and self.pending[5]:
+                self.resolve_card(True)
+            else:
+                self.box._submit(event)
+            return "break"
+
+        def box_escape(self, event):
+            if self.pending and self.pending[5]:
+                self.resolve_card(False)
+            else:
+                self.box.hide()
+            return "break"
+
+        def box_open_window(self):
+            self.box.hide(after_action=True)
+            self.show_window()
+
+        def set_status(self, text):
+            self.status.config(text=text)
+            self.box.set_status(text)
 
         # -- server lifecycle
         def boot(self):
@@ -91,19 +189,26 @@ def run_app():
                 self.q.put(("fatal", str(e)))
 
         def on_close(self):
+            """The window's close button hides it; the server, hotkey and menu-bar icon stay."""
+            if self.menubar.ok or self.hotkey:
+                self.root.withdraw()
+            else:
+                self.quit()
+
+        def quit(self):
             self.stop_event.set()
             if self.server_proc and self.server_proc.poll() is None:
                 self.server_proc.terminate()
+            if self.hotkey:
+                self.hotkey.unregister()
+            self.menubar.destroy()
             self.root.destroy()
 
         # -- transcript helpers
         def write(self, text, tag=None):
-            self.chat.configure(state="normal")
-            self.chat.insert("end", text, tag)
-            self.chat.configure(state="disabled")
-            self.chat.see("end")
+            self.out.write(text, tag)
 
-        # -- actions
+        # -- sending
         def on_enter(self, event):
             if event.state & 0x1:          # Shift+Enter → newline
                 return None
@@ -117,26 +222,35 @@ def run_app():
             msg = self.entry.get("1.0", "end").strip()
             if not msg:
                 return
-            if msg.lower() == "/wrong" or msg.lower().startswith("/wrong "):
+            if self.submit(msg, self.main_view, from_box=False):
                 self.entry.delete("1.0", "end")
+
+        def submit(self, msg, view, from_box):
+            """Handle one message from the window or the box. Returns True if it was taken
+            (the input can be cleared), False if it should stay in the input."""
+            self.out, self.from_box = view, from_box
+            if is_wrong(msg):
                 self.report_wrong(msg[len("/wrong"):].strip())
-                return
-            if self.pending:                   # a new message skips the open card
-                self.resolve_card(False, "Skipped — nothing was run.")
+                return True
+            self.skip_card()
             if not self.attachment and self.try_action(msg):
-                return
+                return True
             if not self.ready:
                 self.write("The model is still loading — commands like “open Safari” already work.\n\n", "note")
-                return
-            self.entry.delete("1.0", "end")
+                return False
             if not self.attachment and pipeline.wants_router(msg):
                 self.write("You: ", "user")
                 self.write(msg + "\n\n")
                 self.busy = True
-                self.status.config(text="Working out whether that's a command…")
+                self.set_status("Working out whether that's a command…")
                 threading.Thread(target=self.route, args=(msg,), daemon=True).start()
-                return
+                return True
             self.start_chat(msg)
+            return True
+
+        def skip_card(self):
+            if self.pending:                   # a new message skips the open card
+                self.resolve_card(False, "Skipped — nothing was run.")
 
         def start_chat(self, msg, user_written=False):
             shown = msg
@@ -157,7 +271,7 @@ def run_app():
             self.busy, self.reply = True, ""
             self.stop_event.clear()
             self.send_btn.config(text="Stop")
-            self.status.config(text="Thinking…")
+            self.set_status("Thinking…")
             threading.Thread(target=self.generate, args=(prompt,), daemon=True).start()
 
         # -- actions (fast path; the permission gate decides what runs)
@@ -169,7 +283,6 @@ def run_app():
                 return False
             if outcome.kind == "chat":
                 return False
-            self.entry.delete("1.0", "end")
             self.write("You: ", "user")
             self.write(msg + "\n\n")
             if outcome.kind == "ask":
@@ -194,20 +307,21 @@ def run_app():
                 self.show_card(outcome.proposal)
             elif outcome.kind == "done":
                 self.show_result(outcome.proposal, outcome.result)
-                self.status.config(text="Ready")
+                self.set_status("Ready")
             else:                              # refused: the user named something that isn't there
                 hint = f" Did you mean: {', '.join(outcome.suggestions)}?" if outcome.suggestions else ""
                 self.write(f"✗ {outcome.message}{hint}\n", "fail")
                 self.offer_wrong(msg, misses.describe_refusal(outcome.message))
                 self.write("\n")
-                self.status.config(text="Ready")
+                self.set_status("Ready")
 
         def just_chat(self):
             """Card button on model suggestions: drop the action, answer the message in chat."""
             if not self.pending:
                 return
-            text = self.pending[0].text
+            text, view, from_box = self.pending[0].text, self.pending[4], self.pending[5]
             self.resolve_card(False, "Answered in chat instead — nothing was run.")
+            self.out, self.from_box = view, from_box
             self.start_chat(text, user_written=True)
 
         def show_result(self, proposal, result):
@@ -222,29 +336,24 @@ def run_app():
                     self.write(result.output + "\n", "note")
             self.offer_wrong(proposal.text, misses.describe_action(proposal, "auto", result))
             self.write("\n")
+            if self.from_box and hide_after(result, proposal.plan):
+                self.box.hide(after_action=True)
 
         # -- "that was wrong": save real mistakes, later turned into eval cases
         def offer_wrong(self, text, what):
             """A small link under a reply/action; a click saves it to the misses file."""
             self.last_miss = (text, what)
-            self.links += 1
-            tag = f"wrong{self.links}"
-            self.chat.tag_config(tag, foreground="#aaaaaa", font=("Helvetica", 10))
-            saved = []
+            links = []
 
-            def click(event):
-                if saved:
+            def click():
+                if not links:
                     return
-                saved.append(True)
+                for link in links:
+                    link.add(" — saved, thanks", "note")
+                links.clear()
                 misses.record(text, what)
-                self.chat.configure(state="normal")
-                self.chat.insert(f"{tag}.last", " — saved, thanks", "note")
-                self.chat.configure(state="disabled")
-                self.status.config(text="Saved as a miss — `python -m bitnet_desk.actions misses` turns it into an eval case")
-            self.chat.tag_bind(tag, "<Button-1>", click)
-            self.chat.tag_bind(tag, "<Enter>", lambda e: self.chat.config(cursor="pointinghand"))
-            self.chat.tag_bind(tag, "<Leave>", lambda e: self.chat.config(cursor=""))
-            self.write("⚑ that was wrong", tag)
+                self.set_status("Saved as a miss — `python -m bitnet_desk.actions misses` turns it into an eval case")
+            links += self.out.link("⚑ that was wrong", click, style="faint")
             self.write("\n")
 
         def report_wrong(self, note):
@@ -257,28 +366,24 @@ def run_app():
             self.write(f"Saved “{text}” as a miss" + (f" (you expected: {note})" if note else "")
                        + ". `python -m bitnet_desk.actions misses` turns it into an eval case.\n\n", "note")
 
-        def write_items(self, paths):
+        def write_items(self, paths, view=None):
             """Clickable paths; a click opens it through the permission gate like any other action."""
             from ..actions.resolve import tilde
+            view = view or self.out
             for path in paths:
-                self.links += 1
-                tag = f"link{self.links}"
-                self.chat.tag_config(tag, foreground="#1f4e8c", underline=True)
-                self.chat.tag_bind(tag, "<Button-1>", lambda e, p=path: self.open_item(p))
-                self.chat.tag_bind(tag, "<Enter>", lambda e: self.chat.config(cursor="pointinghand"))
-                self.chat.tag_bind(tag, "<Leave>", lambda e: self.chat.config(cursor=""))
-                self.write("  " + tilde(path), tag)
-                self.write("\n")
+                view.write("  ")
+                view.link(tilde(path), lambda p=path, v=view: self.open_item(p, v))
+                view.write("\n")
 
-        def open_item(self, path):
+        def open_item(self, path, view):
+            self.out, self.from_box = view, view is not self.main_view
             try:
                 plan = actions.TOOLS["open_path"].make_plan({"path": path})
             except actions.ActionError as e:
                 self.write(f"✗ {e.message}\n\n", "fail")
                 return
             proposal = permissions.Proposal(f"open {path}", "click", plan)
-            if self.pending:
-                self.resolve_card(False, "Skipped — nothing was run.")
+            self.skip_card()
             if permissions.needs_approval(plan):
                 self.show_card(proposal)
             else:
@@ -286,30 +391,28 @@ def run_app():
 
         def show_card(self, proposal):
             frame, run_btn, deny_btn, status = cards.build_card(
-                self.chat, cards.card_for(proposal),
+                self.out.card_parent, cards.card_for(proposal),
                 on_run=lambda: self.resolve_card(True), on_deny=lambda: self.resolve_card(False),
                 on_chat=self.just_chat if proposal.route == "model" else None)
-            self.chat.configure(state="normal")
-            self.chat.window_create("end", window=frame)
-            self.chat.insert("end", "\n\n")
-            self.chat.configure(state="disabled")
-            self.chat.see("end")
-            self.pending = (proposal, run_btn, deny_btn, status)
-            self.status.config(text=f"Waiting for your approval — {cards.APPROVE_KEY} to run, Esc to deny")
+            self.out.embed(frame, summary=f"⌛ {proposal.plan.summary} — waiting for you in the command box")
+            self.pending = (proposal, run_btn, deny_btn, status, self.out, self.from_box)
+            self.set_status(f"Waiting for your approval — {cards.APPROVE_KEY} to run, Esc to deny")
 
         def resolve_card(self, approved, denied_text="Denied — nothing was run."):
             if not self.pending:
                 return
-            proposal, run_btn, deny_btn, status = self.pending
+            proposal, run_btn, deny_btn, status, view, from_box = self.pending
             self.pending = None
             for button in run_btn.master.winfo_children():     # Run, Deny and Just chat
                 button.config(state="disabled")
             if not approved:
                 permissions.deny(proposal)
                 status.config(text=denied_text, fg="#888888")
-                self.status.config(text="Ready" if self.ready else "Starting local model…")
+                view.card_status(denied_text, "note")
+                self.set_status("Ready" if self.ready else "Starting local model…")
                 self.last_miss = (proposal.text, misses.describe_action(proposal, "denied"))
                 if denied_text.startswith("Denied"):           # an explicit Deny may mean "wrong action"
+                    self.out = view
                     self.offer_wrong(*self.last_miss)
                     self.write("\n")
                 return
@@ -321,8 +424,26 @@ def run_app():
                                              progress=lambda text: self.q.put(("progress", (status, text))))
                 except Exception as e:
                     result = actions.Result(False, f"Couldn't run it: {e}")
-                self.q.put(("action", (status, proposal, result)))
+                self.q.put(("action", (status, proposal, result, view, from_box)))
             threading.Thread(target=work, daemon=True).start()
+
+        def on_action_done(self, status, proposal, result, view, from_box):
+            self.last_miss = (proposal.text, misses.describe_action(proposal, "approved", result))
+            text = cards.outcome_line(result) + (f"\n{result.output}" if result.output else "")
+            view.card_status(text, "ok" if result.ok else "fail")
+            if result.items:
+                self.write_items(result.items, view)
+                view.write("\n")
+            try:
+                status.config(text=text, fg="#2d6a2d" if result.ok else "#b00020")
+            except tk.TclError:        # card was cleared meanwhile; the log has it
+                pass
+            self.out = view
+            self.offer_wrong(*self.last_miss)
+            self.write("\n")
+            self.set_status("Ready" if self.ready else "Starting local model…")
+            if from_box and hide_after(result, proposal.plan):
+                self.root.after(700, lambda: self.box.hide(after_action=True))   # long enough to see ✓
 
         def on_approve_key(self, event):
             if self.pending:
@@ -367,9 +488,8 @@ def run_app():
             if self.pending:
                 self.resolve_card(False)
             self.history.clear()
-            self.chat.configure(state="normal")
-            self.chat.delete("1.0", "end")
-            self.chat.configure(state="disabled")
+            self.main_view.clear()
+            self.box.view.clear()
 
         def save(self):
             path = filedialog.asksaveasfilename(defaultextension=".md",
@@ -378,7 +498,7 @@ def run_app():
                 return
             lines = [f"**{'You' if r == 'user' else 'Assistant'}:** {t}\n" for r, t in self.history]
             Path(path).write_text("\n".join(lines), encoding="utf-8")
-            self.status.config(text=f"Saved to {path}")
+            self.set_status(f"Saved to {path}")
 
         # -- event loop bridge
         def poll(self):
@@ -387,12 +507,12 @@ def run_app():
                     kind, val = self.q.get_nowait()
                     if kind == "ready":
                         self.ready = True
-                        self.status.config(text=f"Ready · BitNet b1.58 2B4T · CPU · {cfg.THREADS} threads · "
-                                                f"localhost only")
-                        self.write("Model loaded locally. The model never sends anything you type anywhere; only actions "
-                                   "you approve (like a download) use the network.\n\n", "note")
+                        self.set_status(f"Ready · BitNet b1.58 2B4T · CPU · {cfg.THREADS} threads · localhost only")
+                        self.main_view.write("Model loaded locally. The model never sends anything you type "
+                                             "anywhere; only actions you approve (like a download) use the "
+                                             "network.\n\n", "note")
                     elif kind == "fatal":
-                        self.status.config(text="Model failed to start")
+                        self.set_status("Model failed to start")
                         messagebox.showerror("BitNet Desk", val)
                     elif kind == "tok":
                         self.reply += val
@@ -408,19 +528,9 @@ def run_app():
                         except tk.TclError:
                             pass
                     elif kind == "action":
-                        status, proposal, result = val
-                        self.last_miss = (proposal.text, misses.describe_action(proposal, "approved", result))
-                        text = cards.outcome_line(result) + (f"\n{result.output}" if result.output else "")
-                        if result.items:
-                            self.write_items(result.items)
-                            self.write("\n")
-                        try:
-                            status.config(text=text, fg="#2d6a2d" if result.ok else "#b00020")
-                        except tk.TclError:        # card was cleared meanwhile; the log has it
-                            pass
-                        self.offer_wrong(*self.last_miss)
-                        self.write("\n")
-                        self.status.config(text="Ready" if self.ready else "Starting local model…")
+                        self.on_action_done(*val)
+                    elif kind == "hotkey":
+                        self.box.toggle()
             except queue.Empty:
                 pass
             self.root.after(30, self.poll)
@@ -431,14 +541,14 @@ def run_app():
             reply = self.reply.strip()
             if kind == "err":
                 self.write(f"\n[error: {val}]", "note")
-                self.status.config(text="Error talking to the local model")
+                self.set_status("Error talking to the local model")
             else:
                 if reply:
                     self.history.append(("assistant", reply))
                 if self.stop_event.is_set():
                     self.write(" [stopped]", "note")
                 tps = (val or {}).get("predicted_per_second")
-                self.status.config(text=f"Ready · {tps:.1f} tokens/s" if tps else "Ready")
+                self.set_status(f"Ready · {tps:.1f} tokens/s" if tps else "Ready")
                 if reply:
                     self.write("\n")
                     self.offer_wrong(self.last_user_text, misses.describe_chat(reply))
