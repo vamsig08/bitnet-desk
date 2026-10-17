@@ -188,7 +188,8 @@ def test_screenshot_result_is_the_file_or_a_clear_failure(fake_mac, runner):
 def test_lock_screen_command(fake_mac, monkeypatch):
     import sys
     cmd = plan("lock_screen").commands[0]
-    if Path(system.LOGIN_FRAMEWORK).exists():
+    if sys.platform == "darwin":                                          # loading it doesn't lock
+        assert system.can_lock_directly()
         assert cmd[:2] == (sys.executable, "-c") and "SACLockScreenImmediate()" in cmd[2]
     monkeypatch.setattr(system, "LOGIN_FRAMEWORK", "/nonexistent/login")
     assert plan("lock_screen").commands == (("pmset", "displaysleepnow"),)

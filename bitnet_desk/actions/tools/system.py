@@ -178,9 +178,19 @@ def _run_screenshot(plan, runner, progress):
     return Result(True, plan.done, items=(str(dest),))
 
 
+def can_lock_directly(path=None):
+    """Is login.framework's SACLockScreenImmediate there? Loading it doesn't lock anything. (Since
+    macOS 11 system frameworks live in the dyld cache, so the file itself never exists on disk.)"""
+    import ctypes
+    try:
+        return hasattr(ctypes.CDLL(path or LOGIN_FRAMEWORK), "SACLockScreenImmediate")
+    except OSError:
+        return False
+
+
 def _lock(args):
-    if Path(LOGIN_FRAMEWORK).exists():   # what Control Center's Lock Screen uses (private, but it locks)
-        cmd = (sys.executable, "-c", f"import ctypes; ctypes.CDLL({LOGIN_FRAMEWORK!r}).SACLockScreenImmediate()")
+    if can_lock_directly():              # what Control Center's Lock Screen uses (private, but it locks)
+        cmd = (sys.executable, "-c", f'import ctypes; ctypes.CDLL("{LOGIN_FRAMEWORK}").SACLockScreenImmediate()')
     else:                                # locks only if "require password" is set for display sleep
         cmd = ("pmset", "displaysleepnow")
     return Plan(tool="lock_screen", args={}, risk=Risk.CHANGES, summary="Lock the screen",
