@@ -95,6 +95,13 @@ Type a command in the chat box and it happens right away, without asking the mod
 | `open github.com`, `go to https://…` | opens the page in your browser — **asks first** |
 | `download https://…/file.pdf` | saves it to ~/Downloads, never overwriting — **asks first** |
 | `` run `git status` `` or `$ git status` | runs exactly that command in your home folder — **always asks** |
+| `pause`, `play`, `next song`, `previous track`, `pause spotify` | controls Spotify or Music (whichever is playing; Spotify if neither is open) |
+| `play my focus playlist` | plays a playlist you listed in the settings file |
+| `volume up`, `turn it down`, `volume 30`, `mute`, `unmute` | changes the Mac's volume |
+| `turn on do not disturb`, `dnd off` | switches Do Not Disturb (needs two Shortcuts, see below) |
+| `take a screenshot`, `screenshot this window`, `screenshot of an area` | saves a screenshot where macOS saves them (usually the Desktop) |
+| `lock my mac` | locks the screen — **always asks** |
+| `empty the trash` | permanently empties the Trash — **always asks** |
 
 Polite versions work too ("can you open Calculator for me?"). These work even while the model is
 still loading.
@@ -108,8 +115,9 @@ instead. Everything else goes straight to the chat. How often the model gets it 
 in `docs/evals.md`.
 
 **Permissions.** Every action has a risk level: *read-only*, *changes things*, *network* or *shell*.
-Read-only actions just run. Opening apps and files/folders runs straight away too, because they're on
-the auto-approve list (you can change that, see below). Anything else shows a card with the exact
+Read-only actions just run. Opening apps and files/folders, music, volume, Do Not Disturb and
+screenshots run straight away too, because they're on the auto-approve list (you can change that, see
+below). Locking the screen and emptying the Trash always ask, whatever the list says. Anything else shows a card with the exact
 command, and nothing runs until you click **Run** (or press ⌘↩). **Deny** (or Esc) cancels it. Opening
 something that runs code, like a `.command` script, always asks. Network and shell actions will
 always ask, whatever the settings say.
@@ -144,7 +152,8 @@ system_prompt = "You are my terse coding buddy."
 Actions have their own sections in the same file:
 ```toml
 [actions]
-auto_approve = ["open_app", "open_path", "now"]   # the default; [] makes everything ask
+auto_approve = ["open_app", "open_path", "now", "media", "playlist", "volume", "dnd", "screenshot"]
+                                                  # ↑ the default; [] makes everything ask
 log = true                                        # false turns off the action log
 
 editor = "Visual Studio Code"                      # what "start project" opens the folder in
@@ -159,6 +168,34 @@ path = "~/code/myapp"
 aliases = ["my app"]     # "start my app" works too
 # editor = "Xcode"       # optional, per project
 ```
+Music, playlists and Do Not Disturb:
+```toml
+[media]
+player = "auto"          # or "Spotify" / "Music"; auto = whichever is playing, else Spotify
+
+[playlists]              # "play my focus playlist"
+focus = "spotify:playlist:37i9dQZF1DWZeKCadgRdKQ"     # Spotify: Share › Copy link works too
+"road trip" = "Road Trip"                            # anything else: a playlist in the Music app
+
+[actions]
+dnd_on_shortcut = "BitNet DND On"     # the default names
+dnd_off_shortcut = "BitNet DND Off"
+```
+macOS has no public switch for Do Not Disturb, so the app runs two Shortcuts you make once. In the
+Shortcuts app, make one called **BitNet DND On** with the single action *Set Focus* → Do Not Disturb →
+Turn On, and one called **BitNet DND Off** with *Set Focus* → Turn Off.
+
+**macOS permission prompts (once each):**
+- The first time you control **Spotify** or **Music**, macOS asks whether the app may control it
+  (Automation).
+- The first time you **empty the Trash**, it asks the same about **Finder**.
+- The first **screenshot** asks for **Screen Recording**. Without it, you only get the wallpaper and
+  the app's own windows.
+
+The prompt names whatever started BitNet Desk: Terminal, or *python3.12* when it starts at login. So
+you may see each prompt once per way of starting it. Volume, Do Not Disturb and lock screen ask for
+nothing. You can change these choices later in System Settings › Privacy & Security.
+
 Shell commands are never written by the model: only a command you type in backticks, quotes, or
 after `$ ` is run, and only after you approve it.
 

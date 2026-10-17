@@ -1,7 +1,8 @@
 """The permission gate — the only code that runs a plan.
 
 Read-only plans run at once. "Changes things" plans run at once only if their tool is in
-`[actions] auto_approve`. Network and shell plans always need approval, whatever the config says.
+`[actions] auto_approve` and isn't an always-ask tool (lock screen, empty Trash). Network and shell
+plans always need approval, whatever the config says.
 """
 import subprocess
 import time
@@ -25,7 +26,8 @@ class Proposal:
 
 
 def auto_approved():
-    return {n for n in cfg.AUTO_APPROVE if n in TOOLS and TOOLS[n].risk <= Risk.CHANGES}
+    return {n for n in cfg.AUTO_APPROVE
+            if n in TOOLS and TOOLS[n].risk <= Risk.CHANGES and not TOOLS[n].always_ask}
 
 
 def config_problems():
@@ -36,10 +38,14 @@ def config_problems():
             out.append(f"auto_approve: unknown action '{name}' — ignored")
         elif TOOLS[name].risk > Risk.CHANGES:
             out.append(f"auto_approve: '{name}' is a {TOOLS[name].risk.label} action and always asks — ignored")
+        elif TOOLS[name].always_ask:
+            out.append(f"auto_approve: '{name}' always asks — ignored")
     return out
 
 
 def needs_approval(plan):
+    if TOOLS[plan.tool].always_ask:
+        return True
     if plan.risk == Risk.READ_ONLY:
         return False
     return not (plan.risk == Risk.CHANGES and plan.tool in auto_approved())

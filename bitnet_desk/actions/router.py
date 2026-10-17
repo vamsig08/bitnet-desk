@@ -31,6 +31,8 @@ EXAMPLES = [
     ("grab https://example.org/data.zip", {"tool": "download", "args": {"url": "https://example.org/data.zip"}}),
     ("find the slides about the budget", {"tool": "find", "args": {"query": "budget slides"}}),
     ("run `ls -la`", {"tool": "shell", "args": {"command": "ls -la"}}),
+    ("pause the song", {"tool": "media", "args": {"action": "pause"}}),
+    ("mute the speakers", {"tool": "volume", "args": {"action": "mute"}}),
     ("run a virus scan", {"tool": "chat"}),
     ("show me how to bake bread", {"tool": "chat"}),
     ("what day is it", {"tool": "now", "args": {}}),
@@ -72,8 +74,10 @@ class Route:
 
 
 def tools():
-    """The tools offered to the model (start_project only when projects are configured)."""
-    return [t for t in TOOLS.values() if t.name != "start_project" or cfg.PROJECTS]
+    """The tools offered to the model: not the fast-path-only ones (lock screen, empty Trash, Do Not
+    Disturb, screenshot), and projects/playlists only when some are configured."""
+    return [t for t in TOOLS.values() if t.model
+            and (t.name != "start_project" or cfg.PROJECTS) and (t.name != "playlist" or cfg.PLAYLISTS)]
 
 
 def labels():
@@ -86,6 +90,10 @@ def schema(text=None):
     found = literals(text) if text is not None else {}
     for t in tools():
         props = {k: dict(v) for k, v in t.args.items()}
+        if t.name == "playlist":                         # only the user's own playlists
+            props["name"] = {"enum": list(cfg.PLAYLISTS)}
+        if text is not None and t.name in ("media", "volume"):
+            _copy_only_media(t.name, props, text)
         if t.name in COPY_ARG and text is not None:
             if not found[t.name]:
                 continue
@@ -100,11 +108,30 @@ def schema(text=None):
     return {"oneOf": alts}
 
 
+def _copy_only_media(tool, props, text):
+    """A player only if the message names one; a volume level only if it has that number."""
+    if tool == "media":
+        from .ground import player_named
+        named = [p for p in props["player"]["enum"] if player_named(p, text)]
+        if named:
+            props["player"] = {"enum": named}
+        else:
+            del props["player"]
+    else:
+        levels = sorted({int(n) for n in re.findall(r"\b(\d{1,3})\b", text) if int(n) <= 100})
+        if levels:
+            props["level"] = {"enum": levels}
+        else:
+            del props["level"]
+            props["action"] = {"type": "string", "enum": [a for a in props["action"]["enum"] if a != "set"]}
+
+
 def system_text():
     lines = []
     for t in tools():
         args = ", ".join(t.args)
-        extra = f" — the user's projects are: {', '.join(cfg.PROJECTS)}" if t.name == "start_project" else ""
+        extra = {"start_project": f" — the user's projects are: {', '.join(cfg.PROJECTS)}",
+                 "playlist": f" — the user's playlists are: {', '.join(cfg.PLAYLISTS)}"}.get(t.name, "")
         lines.append(f"- {t.label}({args}): {t.summary}{extra}")
     lines.append(f"- {CHAT}: anything else — the assistant just replies")
     return INTRO + "\n".join(lines)

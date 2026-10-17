@@ -65,6 +65,9 @@ class Tool:
     example: str = ""           # for the system prompt: 'open an app ("open Safari")'
     run: Callable = field(default=None, repr=False)   # (plan, runner, progress) -> Result; default runs commands
     optional: tuple = ()        # argument names the model may leave out
+    always_ask: bool = False    # never auto-approved, whatever the config says (lock screen, empty Trash)
+    model: bool = True          # offered to the model router; False = fast path only
+    hides_ui: bool = False      # the command box gets out of the way first (screenshots)
 
     def make_plan(self, args):
         plan = self.plan(args)

@@ -2,7 +2,7 @@
 import sys
 from dataclasses import dataclass
 
-from ..actions.registry import Risk
+from ..actions.registry import TOOLS, Risk
 
 RISK_COLOURS = {Risk.READ_ONLY: "#666666", Risk.CHANGES: "#1f4e8c", Risk.NETWORK: "#b35900",
                 Risk.SHELL: "#b00020"}
@@ -32,9 +32,11 @@ def card_for(proposal):
         source += f" Confidence {proposal.confidence:.0%}."
     if proposal.must_ask and proposal.route == "model":
         source += " It guessed what you meant, so it asks first."
+    note = RISK_NOTES.get(plan.risk, "")
+    if plan.tool in TOOLS and TOOLS[plan.tool].always_ask:
+        note = (note + " " if note else "") + "This always asks first, whatever your settings say."
     return Card(title=plan.summary, badge=plan.risk.label.upper(), colour=RISK_COLOURS[plan.risk],
-                commands="\n".join(plan.shown_commands()), note=RISK_NOTES.get(plan.risk, ""),
-                source=source)
+                commands="\n".join(plan.shown_commands()), note=note, source=source)
 
 
 def outcome_line(result):

@@ -293,7 +293,9 @@ def test_planning_never_touches_the_network_and_only_network_tools_use_it(fake_m
     samples = {"help": {}, "now": {}, "open_app": {"name": "Safari"}, "open_path": {"path": "~/Documents"},
                "open_url": {"url": "https://example.com"}, "start_project": {"name": "bitnet-desk"},
                "download": {"url": "https://example.com/a.pdf"}, "find_files": {"query": "x"},
-               "run_shell": {"command": "true"}}
+               "run_shell": {"command": "true"}, "media": {"action": "play"}, "playlist": {"name": "focus"},
+               "volume": {"action": "up"}, "dnd": {"state": "on"}, "screenshot": {}, "lock_screen": {},
+               "empty_trash": {}}
     assert set(samples) == set(TOOLS)                         # a new tool must be added here
     for name, args in samples.items():
         plan = plan_for(name, **args)                         # no tool may look anything up online

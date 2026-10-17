@@ -46,14 +46,18 @@ ACTION_KEYS = {
     "editor": _text,                    # app that start_project opens the folder in
     "terminal": _app_or_off,            # terminal app for start_project, or false for none
     "download_max_mb": lambda v: isinstance(v, int) and not isinstance(v, bool) and v > 0,
+    "dnd_on_shortcut": _text,           # Shortcuts that turn Do Not Disturb on / off
+    "dnd_off_shortcut": _text,
 }
+# keys of the [media] table -> check
+MEDIA_KEYS = {"player": lambda v: v in ("auto", "Spotify", "Music")}
 # keys of the [ui] table -> check
 UI_KEYS = {
     "hotkey": _app_or_off,              # "alt+space", "⌥Space", "cmd+shift+k" … or false for none
 }
 # keys of a [projects.<name>] table -> check
 PROJECT_KEYS = {"path": _text, "aliases": _text_list, "editor": _text, "terminal": _app_or_off}
-DEFAULT_AUTO_APPROVE = ("open_app", "open_path", "now")
+DEFAULT_AUTO_APPROVE = ("open_app", "open_path", "now", "media", "playlist", "volume", "dnd", "screenshot")
 
 
 def load_file(path):
@@ -73,6 +77,12 @@ def load_file(path):
     for key, value in data.items():
         if key == "actions" and isinstance(value, dict):
             settings["actions"] = _load_table(path, "actions", value, ACTION_KEYS, errors)
+            continue
+        if key == "media" and isinstance(value, dict):
+            settings["media"] = _load_table(path, "media", value, MEDIA_KEYS, errors)
+            continue
+        if key == "playlists" and isinstance(value, dict):
+            settings["playlists"] = _load_playlists(path, value, errors)
             continue
         if key == "ui" and isinstance(value, dict):
             settings["ui"] = _load_table(path, "ui", value, UI_KEYS, errors)
@@ -125,6 +135,17 @@ def _load_projects(path, table, errors):
             else:
                 clean[key] = value
         out[name] = clean
+    return out
+
+
+def _load_playlists(path, table, errors):
+    """[playlists] focus = "spotify:playlist:…" (or a Spotify link, or a Music playlist's name)."""
+    out = {}
+    for name, value in table.items():
+        if _text(value) and not any(c in value for c in '"\\'):
+            out[" ".join(name.lower().split())] = value.strip()
+        else:
+            errors.append(f"{path}: invalid value for 'playlists.{name}': {value!r} — ignored")
     return out
 
 
@@ -195,6 +216,15 @@ EDITOR = _ACTIONS.get("editor", "Visual Studio Code")
 TERMINAL = _ACTIONS.get("terminal", "Terminal")
 DOWNLOAD_MAX_MB = _ACTIONS.get("download_max_mb", 2048)
 PROJECTS = _FILE.get("projects", {})
+MEDIA_PLAYER = _FILE.get("media", {}).get("player", "auto")    # auto: Spotify if running, else Music…
+PLAYLISTS = _FILE.get("playlists", {})
+DND_ON_SHORTCUT = _ACTIONS.get("dnd_on_shortcut", "BitNet DND On")
+DND_OFF_SHORTCUT = _ACTIONS.get("dnd_off_shortcut", "BitNet DND Off")
+# Test hooks (like BITNET_APP_DIRS): stand-ins for "which apps are running", "which Shortcuts exist"
+# and "where screenshots go", so tests never look at the real Mac. Unset = ask macOS.
+RUNNING_APPS = os.environ.get("BITNET_RUNNING_APPS")
+SHORTCUTS = os.environ.get("BITNET_SHORTCUTS")
+SCREENSHOT_DIR = os.environ.get("BITNET_SCREENSHOT_DIR")
 # Where installed apps are looked up (one folder level deep, e.g. /Applications/Utilities).
 APP_DIRS = tuple(os.environ["BITNET_APP_DIRS"].split(os.pathsep) if os.environ.get("BITNET_APP_DIRS")
                  else ("/Applications", "/System/Applications", "~/Applications"))

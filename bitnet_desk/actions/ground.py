@@ -31,6 +31,25 @@ ZONE = re.compile(r"\b(?:utc|gmt|time ?zones?|pst|pdt|est|edt|cst|cdt|mst|mdt|bs
                   r"aest|hkt|sgt)\b", re.I)
 
 
+# Music and volume picks must be about music or sound, in words the message actually uses.
+MUSIC_WORDS = re.compile(r"\b(?:music|song|songs|track|tracks|tune|tunes|spotify|playlist|album|playing|"
+                         r"play|pause|resume|skip|next|previous|prev)\b", re.I)
+# …and the action must be one the message asks for ("set the volume to 30" isn't "up")
+MEDIA_ACTION_WORDS = {"play": r"play|resume|unpause|start|put on", "pause": r"pause|stop|hold",
+                      "toggle": r"pause|play|toggle", "next": r"next|skip", "previous": r"previous|prev|back|last"}
+VOLUME_ACTION_WORDS = {"up": r"up|louder|raise|increase|higher|more", "down": r"down|quieter|softer|lower|decrease|reduce|less",
+                       "mute": r"(?<!un)mute|silence|sound off", "unmute": r"unmute|sound on", "set": r"\d+"}
+# Naming a player: "spotify"; plain "music" is just music, so Music needs "Apple Music", "the Music app"…
+PLAYER_NAMED = {"Spotify": re.compile(r"\bspotify\b", re.I),
+                "Music": re.compile(r"\b(?:apple music|itunes|music app|(?:in|on|using|with) (?:the )?music)\b", re.I)}
+
+
+def player_named(player, text):
+    rx = PLAYER_NAMED.get(player)
+    return bool(rx and rx.search(text))
+SOUND_WORDS = re.compile(r"\b(?:volume|sound|audio|louder|quieter|softer|mute|unmute|speakers?|loud|quiet)\b", re.I)
+
+
 class Ungrounded(Exception):
     pass
 
@@ -82,6 +101,34 @@ def check(tool, args, text):
         if not (words and all(_word_in(w, tw) for w in words)):
             raise Ungrounded("the search words aren't in the message")
         return "literal" if FILE_HINTS.search(text) else "inferred"   # "find me a pancake recipe": ask
+    if tool == "media":
+        if not MUSIC_WORDS.search(text):
+            raise Ungrounded("the message isn't about music")
+        action = str(args.get("action"))
+        if not re.search(rf"\b(?:{MEDIA_ACTION_WORDS.get(action, '$^')})\b", text, re.I):
+            raise Ungrounded(f"the message doesn't ask to {action}")
+        player = str(args.get("player") or "")
+        if player and not player_named(player, text):
+            raise Ungrounded(f"the message doesn't mention {player}")
+        # playing *something specific* ("play some jazz") isn't resume: allowed, but the user approves
+        extra = [w for w in _content_words(text) if not re.fullmatch(MUSIC_WORDS, w)
+                 and w not in {"music", "on", "in", "apple", "song", "some", "this", "one", "go", "back"}]
+        return "inferred" if extra else "literal"
+    if tool == "volume":
+        if not SOUND_WORDS.search(text):
+            raise Ungrounded("the message isn't about the volume")
+        action = str(args.get("action"))
+        if not re.search(rf"\b(?:{VOLUME_ACTION_WORDS.get(action, '$^')})\b", text, re.I):
+            raise Ungrounded(f"the message doesn't ask to turn it {action}")
+        level = args.get("level")
+        if args.get("action") == "set" and not re.search(rf"\b{level}\b", text):
+            raise Ungrounded("the message doesn't give that volume level")
+        return "literal"
+    if tool == "playlist":
+        words = _content_words(str(args.get("name", "")))
+        if not (words and all(_word_in(w, tw) for w in words)):
+            raise Ungrounded("the message doesn't name that playlist")
+        return "literal"
     if tool in ("open_app", "start_project", "open_path"):
         value = str(args.get("name") or args.get("path") or "")
         if tool == "open_path":

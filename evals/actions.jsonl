@@ -18,7 +18,7 @@
 {"id": 18, "text": "what's the date today?", "tool": "now", "args": {}, "route": "fast"}
 {"id": 19, "text": "run `git status`", "tool": "run_shell", "args": {"command": "git status"}, "route": "fast"}
 {"id": 20, "text": "$ ls -la ~/Desktop", "tool": "run_shell", "args": {"command": "ls -la ~/Desktop"}, "route": "fast"}
-{"id": 21, "text": "play some music", "tool": "open_app", "args": {"name": {"any_of": ["Music", "Spotify"]}}, "route": "model"}
+{"id": 21, "text": "play some music", "tool": "media", "args": {"action": "play"}, "route": "fast", "note": "expected open_app Music/Spotify until the media tool existed (2026-10-17)"}
 {"id": 22, "text": "launch the terminal for me", "tool": "open_app", "args": {"name": "Terminal"}, "route": "fast"}
 {"id": 23, "text": "show me what's on my desktop", "tool": "open_path", "args": {"path": "~/Desktop"}, "route": "model"}
 {"id": 24, "text": "start up my bitnet thing", "tool": "start_project", "args": {"name": "bitnet-desk"}, "route": "model"}
@@ -63,3 +63,40 @@
 {"id": 63, "text": "help", "tool": "help", "args": {}, "route": "fast"}
 {"id": 64, "text": "could you list your commands", "tool": "help", "args": {}, "route": "fast"}
 {"id": 65, "text": "can you help me write a cover letter?", "tool": "chat", "args": {}, "route": "chat", "note": "'help' inside a request is not the help command"}
+{"id": 66, "text": "pause", "tool": "media", "args": {"action": "pause"}, "route": "fast"}
+{"id": 67, "text": "can you pause the music", "tool": "media", "args": {"action": "pause"}, "route": "fast", "note": "polite wrapper"}
+{"id": 68, "text": "play", "tool": "media", "args": {"action": "play"}, "route": "fast"}
+{"id": 69, "text": "resume spotify", "tool": "media", "args": {"action": "play", "player": "Spotify"}, "route": "fast"}
+{"id": 70, "text": "next song please", "tool": "media", "args": {"action": "next"}, "route": "fast"}
+{"id": 71, "text": "skip this track", "tool": "media", "args": {"action": "next"}, "route": "fast"}
+{"id": 72, "text": "go back a song", "tool": "media", "args": {"action": "previous"}, "route": "fast"}
+{"id": 73, "text": "pause spotify", "tool": "media", "args": {"action": "pause", "player": "Spotify"}, "route": "fast"}
+{"id": 74, "text": "volume up", "tool": "volume", "args": {"action": "up"}, "route": "fast"}
+{"id": 75, "text": "turn it down a bit", "tool": "volume", "args": {"action": "down"}, "route": "fast"}
+{"id": 76, "text": "louder", "tool": "volume", "args": {"action": "up"}, "route": "fast"}
+{"id": 77, "text": "set the volume to 30", "tool": "volume", "args": {"action": "set", "level": 30}, "route": "fast"}
+{"id": 78, "text": "volume 45%", "tool": "volume", "args": {"action": "set", "level": 45}, "route": "fast"}
+{"id": 79, "text": "mute", "tool": "volume", "args": {"action": "mute"}, "route": "fast"}
+{"id": 80, "text": "could you unmute the sound for me", "tool": "volume", "args": {"action": "unmute"}, "route": "fast", "note": "polite wrapper"}
+{"id": 81, "text": "turn on do not disturb", "tool": "dnd", "args": {"state": "on"}, "route": "fast"}
+{"id": 82, "text": "dnd off", "tool": "dnd", "args": {"state": "off"}, "route": "fast"}
+{"id": 83, "text": "take a screenshot", "tool": "screenshot", "args": {"what": "screen"}, "route": "fast"}
+{"id": 84, "text": "screenshot this window", "tool": "screenshot", "args": {"what": "window"}, "route": "fast"}
+{"id": 85, "text": "grab a screenshot of an area", "tool": "screenshot", "args": {"what": "area"}, "route": "fast"}
+{"id": 86, "text": "lock my mac", "tool": "lock_screen", "args": {}, "route": "fast", "note": "always asks"}
+{"id": 87, "text": "please lock the screen", "tool": "lock_screen", "args": {}, "route": "fast", "note": "always asks"}
+{"id": 88, "text": "empty the trash", "tool": "empty_trash", "args": {}, "route": "fast", "note": "always asks"}
+{"id": 89, "text": "play my focus playlist", "tool": "playlist", "args": {"name": "focus"}, "route": "fast"}
+{"id": 90, "text": "play playlist chill", "tool": "playlist", "args": {"name": "chill"}, "route": "fast", "note": "a Music playlist, by name"}
+{"id": 91, "text": "/skip to the next one", "tool": "media", "args": {"action": "next"}, "route": "model"}
+{"id": 92, "text": "/make it quieter", "tool": "volume", "args": {"action": "down"}, "route": "model"}
+{"id": 93, "text": "play the deep work mix", "tool": "playlist", "args": {"name": "deep work"}, "route": "model", "note": "no 'playlist' word: the model, choosing from your playlists"}
+{"id": 94, "text": "how do I take a screenshot on a Mac", "tool": "chat", "args": {}, "route": "chat", "note": "trap: question about the tool"}
+{"id": 95, "text": "what's the volume of a cylinder", "tool": "chat", "args": {}, "route": "chat", "note": "trap: other meaning of volume"}
+{"id": 96, "text": "help me lock in on this essay", "tool": "chat", "args": {}, "route": "chat", "note": "trap"}
+{"id": 97, "text": "should I empty the trash", "tool": "chat", "args": {}, "route": "chat", "note": "trap: a question, not a command"}
+{"id": 98, "text": "play a game with me", "tool": "chat", "args": {}, "route": "model", "note": "trap: command verb, not a command"}
+{"id": 99, "text": "next, explain recursion", "tool": "chat", "args": {}, "route": "chat", "note": "trap"}
+{"id": 100, "text": "pause and think before answering", "tool": "chat", "args": {}, "route": "chat", "note": "trap"}
+{"id": 101, "text": "turn up the heat on this intro", "tool": "chat", "args": {}, "route": "chat", "note": "trap: writing request"}
+{"id": 102, "text": "play some jazz", "tool": "chat", "args": {}, "route": "model", "note": "no music search: resuming would be wrong; at most a card that asks"}

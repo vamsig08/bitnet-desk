@@ -48,9 +48,9 @@ Step 1 — always one keypress away (no macOS permissions needed):
 - [x] Launch at login (LaunchAgent, `--background`), toggled from the menu or `--login on|off`
 
 Step 2 — system and media tools (each with fast-path rules and eval cases):
-- [ ] Media: play/pause/next/previous for Spotify and Music; play a configured playlist
-- [ ] Volume up/down/set/mute; Do Not Disturb on/off (via two Shortcuts); take screenshot
-- [ ] Lock screen and empty Trash — `always_ask`, fast path only (never offered to the model)
+- [x] Media: play/pause/next/previous for Spotify and Music; play a configured playlist
+- [x] Volume up/down/set/mute; Do Not Disturb on/off (via two Shortcuts); take screenshot
+- [x] Lock screen and empty Trash — `always_ask`, fast path only (never offered to the model)
 
 Step 3 — routines:
 - [ ] `[routines.<name>]` in config.toml: steps are fast-path commands; one approval card lists every step; runs in order, stops at the first failure and reports which steps ran
@@ -126,3 +126,4 @@ Do Not Disturb; "pause", "volume 20" and "lock my mac" work the same way; the ev
 - 2026-10-16: "That was wrong" feedback: a ⚑ link under every reply/action and `/wrong [note]` save the message + what the app did to a private `misses.jsonl`; `python -m bitnet_desk.actions misses` asks for the right answer and appends eval cases (route worked out automatically). Projects bitnet-desk and tx-lead-engine added to the user's config; "start bitnet-desk" verified end to end. Spotlight on the dev Mac indexes only apps (findings in the session notes; nothing changed).
 - 2026-10-17: Priorities: new Phase 3 "Reach for it all day" — hotkey + command box + menu bar + launch at login, then system/media tools, then routines (design: `docs/always-there-design.md`; Carbon hotkey verified permission-free inside Tk). RAG and the rest shift down one phase.
 - 2026-10-17: Phase 3 step 1: ⌥Space (`[ui] hotkey`) toggles a command box from any app via Carbon `RegisterEventHotKey` (ctypes; no Accessibility/Input Monitoring); box and window share one conversation (`ui/transcript.py` views); auto actions hide the box, cards/answers/chat show in it. Menu-bar icon (Tk 9 `tk systray`), closing the window hides it, single-instance lock, `--background`, launch at login (LaunchAgent; `--login on|off|status`). macOS lets two apps hold one hotkey (both fire), so clashes with macOS shortcuts and ChatGPT's launcher are detected from their prefs and shown.
+- 2026-10-17: Phase 3 step 2: system and media tools (`tools/system.py`): media (Spotify/Music, the one playing; pause never launches a player), playlists from `[playlists]`, volume, Do Not Disturb via two Shortcuts, screenshot (runs off the UI thread, box steps aside), lock screen and empty Trash (`always_ask`, fast path only). Defaults now auto-approve media/playlist/volume/dnd/screenshot. Fast path refuses clear commands it can't do ("Nothing is playing", unknown playlist, DND not set up) instead of passing them to chat. Model gets media/volume/playlist with copy-only player and level and action-word grounding (it had picked "volume up" for "set the volume to 30"). Planning never sends an Apple event, so no permission prompt appears before approval. Eval 102 cases: fast path 65/65, no false triggers; pipeline 96/102; 3 unsafe picks, all cards.

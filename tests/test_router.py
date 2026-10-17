@@ -22,7 +22,10 @@ def logged():
 
 def test_schema_offers_every_tool_and_chat(fake_mac):
     consts = [alt["properties"]["tool"]["const"] for alt in router.schema()["oneOf"]]
-    assert set(consts) == {t.label for t in TOOLS.values()} | {"chat"}
+    assert set(consts) == {t.label for t in TOOLS.values() if t.model} | {"chat"}
+    assert not {"lock", "trash", "dnd", "screenshot"} & set(consts)       # fast path only, never the model
+    playlist = next(a for a in router.schema()["oneOf"] if a["properties"]["tool"]["const"] == "playlist")
+    assert playlist["properties"]["args"]["properties"]["name"] == {"enum": ["focus", "deep work", "chill"]}
     find = next(a for a in router.schema()["oneOf"] if a["properties"]["tool"]["const"] == "find")
     assert find["properties"]["args"]["required"] == ["query"]          # kind is optional
     url = next(a for a in router.schema()["oneOf"] if a["properties"]["tool"]["const"] == "url")
@@ -34,6 +37,7 @@ def test_project_tool_lists_projects_and_disappears_without_them(fake_mac, monke
     monkeypatch.setenv("BITNET_CONFIG", str(tmp_path / "none.toml"))
     reload_config()
     assert "project" not in router.labels() and "project(" not in router.system_text()
+    assert "playlist" not in router.labels()                            # no playlists configured either
 
 
 def test_labels_are_distinct_and_none_prefixes_another():
@@ -223,3 +227,36 @@ def test_route_sends_the_per_message_schema(fake_mac, mock_server):
     mock_server.json_reply = {"content": '{"tool": "chat"}', "completion_probabilities": []}
     router.route("grab https://x.org/a.zip")
     assert mock_server.seen["body"]["json_schema"] == router.schema("grab https://x.org/a.zip")
+
+
+# -- media and volume: copy-only player and level, and the action must be asked for
+
+def test_players_and_levels_are_copy_only(fake_mac):
+    assert "player" not in offered("play some music")["media"]
+    assert offered("pause it in apple music")["media"]["player"] == {"enum": ["Music"]}
+    assert "level" not in offered("make it quieter")["volume"]
+    assert "set" not in offered("make it quieter")["volume"]["action"]["enum"]
+    assert offered("put the volume at 35 please")["volume"]["level"] == {"enum": [35]}
+
+
+@pytest.mark.parametrize("text,tool,args,how", [
+    ("play some music", "media", {"action": "play"}, "literal"),
+    ("play some jazz", "media", {"action": "play"}, "inferred"),            # resuming isn't jazz: ask
+    ("skip to the next one", "media", {"action": "next"}, "literal"),
+    ("next song please", "media", {"action": "play"}, None),              # wrong action → chat
+    ("write a poem", "media", {"action": "play"}, None),
+    ("pause it on spotify", "media", {"action": "pause", "player": "Music"}, None),
+    ("make it quieter", "volume", {"action": "down"}, "literal"),
+    ("set the volume to 30", "volume", {"action": "up"}, None),
+    ("set the volume to 30", "volume", {"action": "set", "level": 40}, None),
+    ("could you unmute the sound", "volume", {"action": "mute"}, None),
+    ("update the sound settings", "volume", {"action": "up"}, None),
+    ("play the deep work mix", "playlist", {"name": "deep work"}, "literal"),
+    ("play the gym mix", "playlist", {"name": "focus"}, None),
+])
+def test_media_grounding(text, tool, args, how):
+    if how is None:
+        with pytest.raises(ground.Ungrounded):
+            ground.check(tool, args, text)
+    else:
+        assert ground.check(tool, args, text) == how

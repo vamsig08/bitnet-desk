@@ -77,7 +77,8 @@ log = false
 
 
 def test_actions_defaults():
-    assert config.AUTO_APPROVE == ("open_app", "open_path", "now") and config.ACTION_LOG_ENABLED
+    assert config.AUTO_APPROVE == ("open_app", "open_path", "now", "media", "playlist", "volume", "dnd",
+                                   "screenshot") and config.ACTION_LOG_ENABLED
 
 
 def test_bad_actions_settings_are_skipped(write_config):

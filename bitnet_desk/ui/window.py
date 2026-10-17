@@ -277,19 +277,55 @@ def run_app(background=False):
         # -- actions (fast path; the permission gate decides what runs)
         def try_action(self, msg):
             try:
-                outcome = actions.handle(msg)
+                outcome = pipeline.decide_fast(msg)
+                slow = outcome and outcome.kind == "auto" and actions.TOOLS[outcome.proposal.plan.tool].hides_ui
+                if outcome and outcome.kind == "auto" and not slow:
+                    outcome = pipeline.Outcome("done", outcome.proposal, permissions.run(outcome.proposal))
             except Exception as e:             # an action bug must never break chat
                 self.write(f"[action error: {e}]\n\n", "note")
                 return False
-            if outcome.kind == "chat":
+            if outcome is None:
                 return False
             self.write("You: ", "user")
             self.write(msg + "\n\n")
-            if outcome.kind == "ask":
+            if slow:                           # a screenshot: off the UI thread, the box out of the way
+                self.run_in_background(outcome.proposal, approved=False)
+            elif outcome.kind == "ask":
                 self.show_card(outcome.proposal)
+            elif outcome.kind == "refused":
+                self.show_refusal(msg, outcome)
             else:
                 self.show_result(outcome.proposal, outcome.result)
             return True
+
+        def run_in_background(self, proposal, approved, status=None):
+            """Run a plan on a worker thread; the result comes back as an "action" message. Tools that
+            hide the UI (screenshots) get the command box out of the way first."""
+            view, from_box = self.out, self.from_box
+            hid = bool(actions.TOOLS[proposal.plan.tool].hides_ui and from_box and self.box.visible())
+            if hid:
+                self.box.win.withdraw()
+                self.root.update()
+            self.set_status(f"{proposal.plan.summary}…")
+
+            def work():
+                if hid:
+                    time.sleep(0.3)            # let the window finish disappearing
+                try:
+                    result = permissions.run(proposal, approved=approved, progress=(
+                        (lambda text: self.q.put(("progress", (status, text)))) if status else None))
+                except Exception as e:
+                    result = actions.Result(False, f"Couldn't run it: {e}")
+                self.q.put(("action", (status, proposal, result, view, from_box, hid)))
+            threading.Thread(target=work, daemon=True).start()
+
+        def show_refusal(self, msg, outcome):
+            """The user named something that isn't there (an app, project, playlist…): say why."""
+            hint = f" Did you mean: {', '.join(outcome.suggestions)}?" if outcome.suggestions else ""
+            self.write(f"✗ {outcome.message}{hint}\n", "fail")
+            self.offer_wrong(msg, misses.describe_refusal(outcome.message))
+            self.write("\n")
+            self.set_status("Ready" if self.ready else "Starting local model…")
 
         def route(self, msg):
             """Background thread: ask the model which tool fits (only for command-verb messages)."""
@@ -308,12 +344,8 @@ def run_app(background=False):
             elif outcome.kind == "done":
                 self.show_result(outcome.proposal, outcome.result)
                 self.set_status("Ready")
-            else:                              # refused: the user named something that isn't there
-                hint = f" Did you mean: {', '.join(outcome.suggestions)}?" if outcome.suggestions else ""
-                self.write(f"✗ {outcome.message}{hint}\n", "fail")
-                self.offer_wrong(msg, misses.describe_refusal(outcome.message))
-                self.write("\n")
-                self.set_status("Ready")
+            else:
+                self.show_refusal(msg, outcome)
 
         def just_chat(self):
             """Card button on model suggestions: drop the action, answer the message in chat."""
@@ -417,17 +449,19 @@ def run_app(background=False):
                     self.write("\n")
                 return
             status.config(text="Running…", fg="#666666")
+            self.out, self.from_box = view, from_box
+            self.run_in_background(proposal, approved=True, status=status)
 
-            def work():
-                try:
-                    result = permissions.run(proposal, approved=True,
-                                             progress=lambda text: self.q.put(("progress", (status, text))))
-                except Exception as e:
-                    result = actions.Result(False, f"Couldn't run it: {e}")
-                self.q.put(("action", (status, proposal, result, view, from_box)))
-            threading.Thread(target=work, daemon=True).start()
-
-        def on_action_done(self, status, proposal, result, view, from_box):
+        def on_action_done(self, status, proposal, result, view, from_box, hid=False):
+            """A plan finished on a worker thread: an approved card (status = its label) or a
+            screenshot that ran by itself (no card)."""
+            if hid:                            # the box stepped aside for a screenshot: back it comes
+                self.box.show()
+            self.out = view
+            if status is None:
+                self.show_result(proposal, result)
+                self.set_status("Ready" if self.ready else "Starting local model…")
+                return
             self.last_miss = (proposal.text, misses.describe_action(proposal, "approved", result))
             text = cards.outcome_line(result) + (f"\n{result.output}" if result.output else "")
             view.card_status(text, "ok" if result.ok else "fail")
@@ -438,7 +472,6 @@ def run_app(background=False):
                 status.config(text=text, fg="#2d6a2d" if result.ok else "#b00020")
             except tk.TclError:        # card was cleared meanwhile; the log has it
                 pass
-            self.out = view
             self.offer_wrong(*self.last_miss)
             self.write("\n")
             self.set_status("Ready" if self.ready else "Starting local model…")

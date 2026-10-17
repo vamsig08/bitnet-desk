@@ -197,3 +197,42 @@ def unique_path(p):
         candidate = p.with_name(f"{p.stem} ({n}){p.suffix}")
         n += 1
     return candidate
+
+
+# -- read-only lookups for the system tools (each has a test hook in config)
+
+def is_running(app_name):
+    """Is an app with this process name running? (`pgrep -x`, read-only.)"""
+    if cfg.RUNNING_APPS is not None:
+        return app_name in {a.strip() for a in cfg.RUNNING_APPS.split(",") if a.strip()}
+    import subprocess
+    try:
+        return subprocess.run(["pgrep", "-xq", app_name], timeout=3).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+def installed_shortcuts():
+    """Names of the user's Shortcuts (`shortcuts list`, read-only), or None if that can't be asked."""
+    if cfg.SHORTCUTS is not None:
+        return [s for s in cfg.SHORTCUTS.split("\n") if s.strip()]
+    import subprocess
+    try:
+        out = subprocess.run(["shortcuts", "list"], capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return out.stdout.splitlines() if out.returncode == 0 else None
+
+
+def screenshot_dir():
+    """Where macOS saves screenshots (com.apple.screencapture location), else the Desktop."""
+    if cfg.SCREENSHOT_DIR is not None:
+        return Path(cfg.SCREENSHOT_DIR)
+    import subprocess
+    try:
+        out = subprocess.run(["defaults", "read", "com.apple.screencapture", "location"],
+                             capture_output=True, text=True, timeout=5)
+        loc = Path(out.stdout.strip()).expanduser() if out.returncode == 0 else None
+    except (OSError, subprocess.SubprocessError):
+        loc = None
+    return loc if loc and loc.is_dir() else Path.home() / "Desktop"

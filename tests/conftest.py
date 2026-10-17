@@ -44,6 +44,9 @@ def isolated_settings(tmp_path, monkeypatch, reload_config):
     monkeypatch.setenv("BITNET_ACTION_LOG", str(tmp_path / "actions.jsonl"))
     monkeypatch.setenv("BITNET_MISSES", str(tmp_path / "misses.jsonl"))
     monkeypatch.setenv("BITNET_APP_DIRS", str(tmp_path / "no-apps"))   # never scan the real /Applications
+    monkeypatch.setenv("BITNET_RUNNING_APPS", "")                        # never ask macOS what's running,
+    monkeypatch.setenv("BITNET_SHORTCUTS", "")                           # which Shortcuts exist,
+    monkeypatch.setenv("BITNET_SCREENSHOT_DIR", str(tmp_path / "shots"))  # or where screenshots go
     reload_config()
     yield
     monkeypatch.undo()

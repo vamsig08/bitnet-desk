@@ -39,6 +39,9 @@ def _offer(proposal, route=None):
 
 def decide_fast(text):
     m = fastpath.match(text)
+    if isinstance(m, fastpath.Refusal):                 # clear command, missing target: say why
+        permissions.refuse(text, "fast", m.tool, {}, m.message)
+        return Outcome("refused", message=m.message, suggestions=m.suggestions)
     return _offer(Proposal(text, "fast", m.plan)) if m else None
 
 

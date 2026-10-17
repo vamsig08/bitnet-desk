@@ -199,6 +199,25 @@ steps = ["start bitnet-desk", "play my focus playlist", "dnd on"]
   the box only hands focus back if we're still in front 400 ms later. Otherwise the opened app keeps
   it, and so does a box you've reopened in the meantime.
 
+## Changes made while building step 2
+
+- **Refusals on the fast path.** A clear command with nothing to act on, such as "pause" when nothing
+  is playing, an unknown playlist, or Do Not Disturb not set up, now gets "✗ why" (logged as refused)
+  instead of going to chat, where the model might claim it did it.
+- **Pause, next and previous never launch a player.** `tell application "Spotify" to pause` would
+  start Spotify just to pause it. Play and play/pause do launch it.
+- **Screenshots run off the UI thread.** Window and area shots wait up to 2 minutes for your click; run
+  inline, they'd freeze the app. The box hides first and comes back with the result. The
+  `hides_ui` flag on the tool drives this.
+- **The model: copy-only player and level, and action words.** In the first eval run it picked "volume
+  up" for "set the volume to 30" (that would have run without asking), and filled in `player:
+  Spotify` unasked (then rejected by grounding). The grammar now offers a player only if the message
+  names one (plain "music" doesn't name the Music app) and a level only if the message has that
+  number. Grounding requires the action's own word ("down", "skip", "pause"…). After that: no unsafe
+  pick that runs without asking.
+- **Eval case #21** ("play some music") expected open_app Music/Spotify, written before a media tool
+  existed. It now expects media play on the fast path.
+
 ## Not in scope here
 
 Voice, "ask about selection", custom icons or themes for the box, and a Dock-less (menu-bar-only)

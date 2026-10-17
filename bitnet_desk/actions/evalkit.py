@@ -13,11 +13,13 @@ from .registry import TOOLS
 
 CASES = cfg.HERE / "evals" / "actions.jsonl"
 PLANNED_TOOLS = {"help", "now", "open_app", "open_path", "open_url", "start_project", "download",
-                 "find_files", "run_shell", "chat"}
+                 "find_files", "run_shell", "media", "playlist", "volume", "dnd", "screenshot",
+                 "lock_screen", "empty_trash", "chat"}
 ROUTES = {"fast", "model", "chat"}
 
 FIXTURE_APPS = ["Safari", "Spotify", "Music", "Notes", "Calculator", "Visual Studio Code", "Utilities/Terminal"]
 FIXTURE_DIRS = ["Documents", "Downloads", "Desktop", "Projects/bitnet-desk"]
+FIXTURE_SHORTCUTS = ["BitNet DND On", "BitNet DND Off", "Open Spotify"]
 
 
 def load_cases(path=CASES):
@@ -33,9 +35,14 @@ def fake_mac(root):
         (root / "home" / d).mkdir(parents=True, exist_ok=True)
     config = root / "config.toml"
     config.write_text('[projects.bitnet-desk]\npath = "~/Projects/bitnet-desk"\n'
-                      'aliases = ["bitnet desk", "bitnet"]\n', encoding="utf-8")
+                      'aliases = ["bitnet desk", "bitnet"]\n\n'
+                      '[playlists]\nfocus = "spotify:playlist:37i9dQZF1DWZeKCadgRdKQ"\n'
+                      '"deep work" = "https://open.spotify.com/playlist/37i9dQZF1DX8NTLI2TtZa6?si=abc"\n'
+                      'chill = "Chill Mix"\n', encoding="utf-8")
     return {"HOME": str(root / "home"), "BITNET_APP_DIRS": str(root / "Applications"),
-            "BITNET_CONFIG": str(config)}
+            "BITNET_CONFIG": str(config), "BITNET_RUNNING_APPS": "Spotify",   # something is playing
+            "BITNET_SHORTCUTS": "\n".join(FIXTURE_SHORTCUTS),
+            "BITNET_SCREENSHOT_DIR": str(root / "home" / "Desktop")}
 
 
 def _norm(v):
