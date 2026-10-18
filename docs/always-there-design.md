@@ -218,6 +218,39 @@ steps = ["start bitnet-desk", "play my focus playlist", "dnd on"]
 - **Eval case #21** ("play some music") expected open_app Music/Spotify, written before a media tool
   existed. It now expects media play on the fast path.
 
+## Changes made while building step 3
+
+- **Steps are planned when the card is built.** A step that can't be done right now (no such playlist,
+  Do Not Disturb not set up) refuses the whole routine with the step's number and reason, and nothing
+  runs. A step that fails *while running* stops the routine there.
+- **The routine is one log entry plus one per step** (route `routine:<name>`), so the action log shows
+  exactly which steps ran.
+- **Do Not Disturb setup.** `--setup-shortcuts` writes the two Shortcuts (one Set Focus action each),
+  signs them with `shortcuts sign` (Apple's signing service; it sometimes answers error 500, so we
+  retry) and opens them. macOS only adds a shortcut after you click "Add Shortcut": there's no silent
+  install.
+
+## End-to-end harness (`python3.12 -m bitnet_desk.e2e`)
+
+- **No synthetic input.** The app runs in the harness's process (`run_app(mainloop=False)`) and is
+  driven through its own methods: `box.show()` is what the hotkey calls, `box_submit()` what Return
+  does, `permissions.run(approved=True)` what Run does.
+- **Effects are read back from the system:**
+  - volume: `get volume settings`
+  - music: Spotify's `player state` and current track
+  - screenshots: the PNG file and its size
+  - project: Terminal and VS Code window titles (Accessibility, read only)
+  - Do Not Disturb: Control Center's Focus item in the menu bar
+  - menu-bar icon: Accessibility, asked from a worker thread while the main thread keeps the event
+    loop running, because we're the process being asked
+- **Everything is restored afterwards.** The volume is journaled on disk, so a killed run gets it back
+  next time. Spotify goes back to its track, or is paused and quit if it wasn't open (and quit again if
+  it relaunches itself to install an update). New Terminal windows are closed, and the login item is put
+  back as it was. Lock screen and empty Trash are replaced by a refusing tool for the whole run.
+- **Permissions:** `--permissions` reports them without prompting. `AEDeterminePermissionToAutomateTarget`
+  blocks forever for an app that isn't running (and sometimes for one that is), so it runs on a worker
+  thread with a timeout, with a harmless Apple event as the fallback probe.
+
 ## Not in scope here
 
 Voice, "ask about selection", custom icons or themes for the box, and a Dock-less (menu-bar-only)

@@ -102,6 +102,7 @@ Type a command in the chat box and it happens right away, without asking the mod
 | `take a screenshot`, `screenshot this window`, `screenshot of an area` | saves a screenshot where macOS saves them (usually the Desktop) |
 | `lock my mac` | locks the screen — **always asks** |
 | `empty the trash` | permanently empties the Trash — **always asks** |
+| `work mode` (or any routine you define) | runs several commands in a row after one click — **always asks** |
 
 Polite versions work too ("can you open Calculator for me?"). These work even while the model is
 still loading.
@@ -181,9 +182,25 @@ focus = "spotify:playlist:37i9dQZF1DWZeKCadgRdKQ"     # Spotify: Share › Copy 
 dnd_on_shortcut = "BitNet DND On"     # the default names
 dnd_off_shortcut = "BitNet DND Off"
 ```
-macOS has no public switch for Do Not Disturb, so the app runs two Shortcuts you make once. In the
-Shortcuts app, make one called **BitNet DND On** with the single action *Set Focus* → Do Not Disturb →
-Turn On, and one called **BitNet DND Off** with *Set Focus* → Turn Off.
+macOS has no public switch for Do Not Disturb, so the app runs two Shortcuts. Make them once with
+```bash
+python3.12 -m bitnet_desk --setup-shortcuts
+```
+It opens each one in the Shortcuts app; click **Add Shortcut** for both. (macOS never lets an app add
+a shortcut without that click.) To make them by hand instead: in the Shortcuts app, create **BitNet DND
+On** with the single action *Set Focus* → Do Not Disturb → Turn On, and **BitNet DND Off** with *Set
+Focus* → Turn Off.
+
+**Routines** run several commands after one click:
+```toml
+[routines.work-mode]
+aliases = ["work mode", "start work"]
+steps = ["start bitnet-desk", "play my focus playlist", "dnd on"]
+```
+Each step is a command you could type yourself. "work mode" shows one card listing every step and its
+exact commands; **Run** does them in order and stops at the first one that fails, telling you which
+steps ran. If a step can't be done right now (say, the playlist isn't in your settings), the routine
+says which step and why, and nothing runs.
 
 **macOS permission prompts (once each):**
 - The first time you control **Spotify** or **Music**, macOS asks whether the app may control it

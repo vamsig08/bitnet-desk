@@ -14,7 +14,7 @@ from .registry import TOOLS
 CASES = cfg.HERE / "evals" / "actions.jsonl"
 PLANNED_TOOLS = {"help", "now", "open_app", "open_path", "open_url", "start_project", "download",
                  "find_files", "run_shell", "media", "playlist", "volume", "dnd", "screenshot",
-                 "lock_screen", "empty_trash", "chat"}
+                 "lock_screen", "empty_trash", "routine", "chat"}
 ROUTES = {"fast", "model", "chat"}
 
 FIXTURE_APPS = ["Safari", "Spotify", "Music", "Notes", "Calculator", "Visual Studio Code", "Utilities/Terminal"]
@@ -38,7 +38,9 @@ def fake_mac(root):
                       'aliases = ["bitnet desk", "bitnet"]\n\n'
                       '[playlists]\nfocus = "spotify:playlist:37i9dQZF1DWZeKCadgRdKQ"\n'
                       '"deep work" = "https://open.spotify.com/playlist/37i9dQZF1DX8NTLI2TtZa6?si=abc"\n'
-                      'chill = "Chill Mix"\n', encoding="utf-8")
+                      'chill = "Chill Mix"\n\n'
+                      '[routines.work-mode]\naliases = ["work mode", "start work"]\n'
+                      'steps = ["start bitnet-desk", "play my focus playlist", "dnd on"]\n', encoding="utf-8")
     return {"HOME": str(root / "home"), "BITNET_APP_DIRS": str(root / "Applications"),
             "BITNET_CONFIG": str(config), "BITNET_RUNNING_APPS": "Spotify",   # something is playing
             "BITNET_SHORTCUTS": "\n".join(FIXTURE_SHORTCUTS),

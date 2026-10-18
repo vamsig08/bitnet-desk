@@ -295,7 +295,7 @@ def test_planning_never_touches_the_network_and_only_network_tools_use_it(fake_m
                "download": {"url": "https://example.com/a.pdf"}, "find_files": {"query": "x"},
                "run_shell": {"command": "true"}, "media": {"action": "play"}, "playlist": {"name": "focus"},
                "volume": {"action": "up"}, "dnd": {"state": "on"}, "screenshot": {}, "lock_screen": {},
-               "empty_trash": {}}
+               "empty_trash": {}, "routine": {"name": "work-mode"}}
     assert set(samples) == set(TOOLS)                         # a new tool must be added here
     for name, args in samples.items():
         plan = plan_for(name, **args)                         # no tool may look anything up online

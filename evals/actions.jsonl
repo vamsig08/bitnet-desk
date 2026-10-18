@@ -100,3 +100,8 @@
 {"id": 100, "text": "pause and think before answering", "tool": "chat", "args": {}, "route": "chat", "note": "trap"}
 {"id": 101, "text": "turn up the heat on this intro", "tool": "chat", "args": {}, "route": "chat", "note": "trap: writing request"}
 {"id": 102, "text": "play some jazz", "tool": "chat", "args": {}, "route": "model", "note": "no music search: resuming would be wrong; at most a card that asks"}
+{"id": 103, "text": "work mode", "tool": "routine", "args": {"name": "work-mode"}, "route": "fast", "note": "one card for all steps"}
+{"id": 104, "text": "start work", "tool": "routine", "args": {"name": "work-mode"}, "route": "fast", "note": "an alias"}
+{"id": 105, "text": "run the work-mode routine", "tool": "routine", "args": {"name": "work-mode"}, "route": "fast"}
+{"id": 106, "text": "what's my morning routine", "tool": "chat", "args": {}, "route": "chat", "note": "trap: a question about routines"}
+{"id": 107, "text": "how do I build a good work routine", "tool": "chat", "args": {}, "route": "chat", "note": "trap"}

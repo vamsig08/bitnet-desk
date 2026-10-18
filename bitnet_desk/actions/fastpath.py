@@ -233,6 +233,12 @@ def _empty_trash(text):
     return _try("empty_trash", {}, refuse=True) if EMPTY_TRASH.fullmatch(text) else None
 
 
+def _routine(text):
+    from . import routines
+    r = routines.find(text)
+    return _try("routine", {"name": r.name}, refuse=True) if r else None
+
+
 def _now(text):
     return _try("now", {}) if NOW.fullmatch(text) else None
 
@@ -241,13 +247,16 @@ def _help(text):
     return _try("help", {}) if HELP.fullmatch(text) else None
 
 
-RULES = [_help, _now, _shell, _download, _playlist, _media, _volume, _dnd, _screenshot, _lock, _empty_trash,
+RULES = [_routine, _help, _now, _shell, _download, _playlist, _media, _volume, _dnd, _screenshot, _lock, _empty_trash,
          _project, _go, _find, _open]
 
 
-def match(text):
+def match(text, routines=True):
+    """A Match, a Refusal (clear command, can't be done), or None. routines=False: for routine steps."""
     t = normalise(text)
     for rule in RULES:
+        if rule is _routine and not routines:
+            continue
         m = rule(t)
         if m:
             return m

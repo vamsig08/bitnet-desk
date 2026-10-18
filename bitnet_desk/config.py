@@ -55,6 +55,8 @@ MEDIA_KEYS = {"player": lambda v: v in ("auto", "Spotify", "Music")}
 UI_KEYS = {
     "hotkey": _app_or_off,              # "alt+space", "⌥Space", "cmd+shift+k" … or false for none
 }
+# keys of a [routines.<name>] table -> check
+ROUTINE_KEYS = {"steps": lambda v: _text_list(v) and len(v) > 0, "aliases": _text_list}
 # keys of a [projects.<name>] table -> check
 PROJECT_KEYS = {"path": _text, "aliases": _text_list, "editor": _text, "terminal": _app_or_off}
 DEFAULT_AUTO_APPROVE = ("open_app", "open_path", "now", "media", "playlist", "volume", "dnd", "screenshot")
@@ -89,6 +91,9 @@ def load_file(path):
             continue
         if key == "aliases" and isinstance(value, dict):
             settings["aliases"] = _load_aliases(path, value, errors)
+            continue
+        if key == "routines" and isinstance(value, dict):
+            settings["routines"] = _load_routines(path, value, errors)
             continue
         if key == "projects" and isinstance(value, dict):
             settings["projects"] = _load_projects(path, value, errors)
@@ -132,6 +137,25 @@ def _load_projects(path, table, errors):
                 errors.append(f"{path}: unknown setting 'projects.{name}.{key}' — ignored")
             elif not PROJECT_KEYS[key](value):
                 errors.append(f"{path}: invalid value for 'projects.{name}.{key}': {value!r} — ignored")
+            else:
+                clean[key] = value
+        out[name] = clean
+    return out
+
+
+def _load_routines(path, table, errors):
+    """[routines.work-mode] steps = ["start bitnet-desk", "dnd on"] … → {"work-mode": {...}}."""
+    out = {}
+    for name, r in table.items():
+        if not isinstance(r, dict) or not ROUTINE_KEYS["steps"](r.get("steps")):
+            errors.append(f"{path}: routine '{name}' needs steps = [\"…\", …] — ignored")
+            continue
+        clean = {}
+        for key, value in r.items():
+            if key not in ROUTINE_KEYS:
+                errors.append(f"{path}: unknown setting 'routines.{name}.{key}' — ignored")
+            elif not ROUTINE_KEYS[key](value):
+                errors.append(f"{path}: invalid value for 'routines.{name}.{key}': {value!r} — ignored")
             else:
                 clean[key] = value
         out[name] = clean
@@ -218,6 +242,7 @@ DOWNLOAD_MAX_MB = _ACTIONS.get("download_max_mb", 2048)
 PROJECTS = _FILE.get("projects", {})
 MEDIA_PLAYER = _FILE.get("media", {}).get("player", "auto")    # auto: Spotify if running, else Music…
 PLAYLISTS = _FILE.get("playlists", {})
+ROUTINES = _FILE.get("routines", {})
 DND_ON_SHORTCUT = _ACTIONS.get("dnd_on_shortcut", "BitNet DND On")
 DND_OFF_SHORTCUT = _ACTIONS.get("dnd_off_shortcut", "BitNet DND Off")
 # Test hooks (like BITNET_APP_DIRS): stand-ins for "which apps are running", "which Shortcuts exist"

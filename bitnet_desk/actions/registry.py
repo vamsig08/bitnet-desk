@@ -41,6 +41,7 @@ class Plan:
     answer: str = ""            # read-only tools that answer directly (e.g. the time)
     cwd: str = ""               # working directory for commands ("" = inherit)
     shown: tuple = ()           # what the card shows when there are no commands (e.g. a download)
+    steps: tuple = ()           # routines: the frozen plan of every step, run in order
 
     def shown_commands(self):
         return list(self.shown) or [shlex.join(argv) for argv in self.commands]
