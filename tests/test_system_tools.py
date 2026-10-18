@@ -274,3 +274,15 @@ def test_fast_path_system_traps(fake_mac, text):
 def test_unknown_playlist_is_refused_with_your_list(fake_mac, runner):
     out = pipeline.handle("play my gym playlist", runner=runner)
     assert out.kind == "refused" and "Your playlists: focus, deep work, chill" in out.message
+
+
+def test_dnd_shortcut_files(fake_mac, monkeypatch):
+    from bitnet_desk import shortcuts
+    on, off = shortcuts._shortcut(True), shortcuts._shortcut(False)
+    action = on["WFWorkflowActions"][0]
+    assert action["WFWorkflowActionIdentifier"] == "is.workflow.actions.dnd.set"
+    assert action["WFWorkflowActionParameters"]["Enabled"] == 1 and off["WFWorkflowActions"][0][
+        "WFWorkflowActionParameters"]["Enabled"] == 0
+    assert action["WFWorkflowActionParameters"]["FocusModes"]["Identifier"] == "com.apple.donotdisturb.mode.default"
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: (_ for _ in ()).throw(AssertionError("signed")))
+    assert shortcuts.shortcut_files() == {}                              # both installed: nothing to sign

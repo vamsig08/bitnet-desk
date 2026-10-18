@@ -27,7 +27,12 @@ def main(argv=None):
     p.add_argument("--background", action="store_true",
                    help="start hidden: just the menu-bar icon and the hotkey (used at login)")
     p.add_argument("--login", choices=["on", "off", "status"], help="launch at login")
+    p.add_argument("--setup-shortcuts", action="store_true",
+                   help="make the two Do Not Disturb Shortcuts (you click “Add Shortcut” twice)")
     args = p.parse_args(argv)
+    if args.setup_shortcuts:
+        from .shortcuts import setup_shortcuts
+        return 0 if setup_shortcuts() else 1
     if args.login:
         from . import login
         if args.login == "status":

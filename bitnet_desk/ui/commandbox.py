@@ -84,14 +84,12 @@ class CommandBox:
     def hide(self, after_action=False):
         """Hide and give the keyboard back to the app you were in. After an action (e.g. "open
         Safari") that app may now be in front instead, so only step in if we still are."""
-        self.win.withdraw()
         prev = self.prev_pid
-        if not prev:
-            return
-        if after_action:
+        if prev and not after_action:
+            mac.activate(prev)          # first: once the box is gone, macOS gives the front to the next window
+        self.win.withdraw()
+        if prev and after_action:
             self.root.after(400, lambda: self._give_back(prev))
-        else:
-            mac.activate(prev)
 
     def _give_back(self, prev):
         if not self.visible() and mac.frontmost_pid() == os.getpid():    # not if you've reopened it

@@ -28,7 +28,9 @@ def is_wrong(msg):
     return msg.lower() == "/wrong" or msg.lower().startswith("/wrong ")
 
 
-def run_app(background=False):
+def run_app(background=False, mainloop=True):
+    """Start the app. mainloop=False returns the App instead, for the e2e harness to drive by calling
+    its methods (no synthetic keystrokes)."""
     import tkinter as tk
     from tkinter import filedialog, messagebox, scrolledtext
 
@@ -81,7 +83,8 @@ def run_app(background=False):
             self.status = tk.Label(root, text="Starting local model…", anchor="w", fg="#666")
             self.status.pack(fill="x", padx=10, pady=(0, 6))
 
-            for err in cfg.CONFIG_ERRORS + permissions.config_problems():
+            from ..actions import routines
+            for err in cfg.CONFIG_ERRORS + permissions.config_problems() + routines.config_problems():
                 self.write(f"Config: {err}\n\n", "note")
             self.setup_always_there()
             root.protocol("WM_DELETE_WINDOW", self.on_close)
@@ -590,5 +593,7 @@ def run_app(background=False):
             self.write("\n\n")
 
     root = tk.Tk()
-    App(root)
+    app = App(root)
+    if not mainloop:
+        return app
     root.mainloop()

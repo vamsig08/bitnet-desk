@@ -10,6 +10,7 @@ __pycache__/
 
 # runtime
 server.log
+.e2e.log
 *.sqlite
 .DS_Store
 

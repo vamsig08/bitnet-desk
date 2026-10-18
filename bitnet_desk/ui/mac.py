@@ -242,9 +242,110 @@ def activate(pid=None):
                 _send(objc, app, "activate", restype=None)
             _send(objc, app, "activateIgnoringOtherApps:", True, restype=None, argtypes=(c_bool,))
             return
-        other = _send(objc, objc.objc_getClass(b"NSRunningApplication"),
-                      "runningApplicationWithProcessIdentifier:", pid, argtypes=(c_int32,))
-        if other:
+        cls = objc.objc_getClass(b"NSRunningApplication")
+        other = _send(objc, cls, "runningApplicationWithProcessIdentifier:", pid, argtypes=(c_int32,))
+        if not other:
+            return
+        # macOS 14+ "cooperative activation": the active app (us) hands activation over explicitly;
+        # a plain activateWithOptions: from us is often ignored and the next window's app wins instead
+        sel = objc.sel_registerName(b"activateFromApplication:options:")
+        if _send(objc, other, "respondsToSelector:", sel, restype=c_bool, argtypes=(c_void_p,)):
+            me = _send(objc, cls, "currentApplication")
+            _send(objc, other, "activateFromApplication:options:", me, 0, restype=c_bool,
+                  argtypes=(c_void_p, ctypes.c_ulong))
+        else:
             _send(objc, other, "activateWithOptions:", 0, restype=c_bool, argtypes=(ctypes.c_ulong,))
     except (OSError, AttributeError):
         pass
+
+
+# -- permission checks (used by the e2e harness to say which prompt is about to appear)
+
+AUTOMATION = {0: "allowed", -1743: "denied", -1744: "would ask", -600: "app not running"}
+
+
+class _AEDesc(Structure):
+    _fields_ = [("descriptorType", c_uint32), ("dataHandle", c_void_p)]
+
+
+def automation_status(bundle_id, ask=False, timeout=None):
+    """May the app that started us send Apple events to `bundle_id`? 'allowed', 'denied', 'would ask',
+    'app not running' or 'no answer'. With ask=True macOS shows its prompt now if it hasn't been answered.
+
+    macOS can block forever here (an app that's still starting, or just quit), so the call runs on a
+    worker thread: `timeout` seconds (default 10, or 300 when asking — you may be reading the prompt)."""
+    if sys.platform != "darwin":
+        return "unsupported"
+    if not running_pids(bundle_id):     # macOS blocks (no prompt, no answer) for apps that aren't running
+        return "app not running"
+    import threading
+    box = {}
+    t = threading.Thread(target=lambda: box.setdefault("v", _automation_status(bundle_id, ask)), daemon=True)
+    t.start()
+    t.join(timeout or (300 if ask else 10))
+    return box.get("v", "no answer")
+
+
+def _automation_status(bundle_id, ask):
+    cs = ctypes.cdll.LoadLibrary("/System/Library/Frameworks/CoreServices.framework/CoreServices")
+    cs.AECreateDesc.argtypes = [c_uint32, ctypes.c_char_p, ctypes.c_long, POINTER(_AEDesc)]
+    cs.AEDeterminePermissionToAutomateTarget.argtypes = [POINTER(_AEDesc), c_uint32, c_uint32, c_bool]
+    cs.AEDeterminePermissionToAutomateTarget.restype = c_int32
+    cs.AEDisposeDesc.argtypes = [POINTER(_AEDesc)]
+    desc = _AEDesc()
+    data = bundle_id.encode()
+    if cs.AECreateDesc(_fourcc("bund"), data, len(data), byref(desc)):
+        return "error"
+    try:
+        err = cs.AEDeterminePermissionToAutomateTarget(byref(desc), _fourcc("****"), _fourcc("****"), ask)
+    finally:
+        cs.AEDisposeDesc(byref(desc))
+    return AUTOMATION.get(err, f"error {err}")
+
+
+def running_pids(bundle_id):
+    """PIDs of running apps with this bundle id (NSRunningApplication; no Apple events)."""
+    if sys.platform != "darwin":
+        return []
+    objc = _objc()
+    NSString = objc.objc_getClass(b"NSString")
+    s = _send(objc, NSString, "stringWithUTF8String:", bundle_id.encode(), argtypes=(ctypes.c_char_p,))
+    apps = _send(objc, objc.objc_getClass(b"NSRunningApplication"), "runningApplicationsWithBundleIdentifier:", s,
+                 argtypes=(c_void_p,))
+    n = _send(objc, apps, "count", restype=ctypes.c_ulong)
+    return [_send(objc, _send(objc, apps, "objectAtIndex:", i, argtypes=(ctypes.c_ulong,)), "processIdentifier",
+                  restype=c_int32) for i in range(n)]
+
+
+def quit_app(bundle_id):
+    """Ask a running app to quit, like ⌘Q, without an Apple event (no Automation permission)."""
+    if sys.platform != "darwin":
+        return False
+    objc = _objc()
+    NSString = objc.objc_getClass(b"NSString")
+    s = _send(objc, NSString, "stringWithUTF8String:", bundle_id.encode(), argtypes=(ctypes.c_char_p,))
+    apps = _send(objc, objc.objc_getClass(b"NSRunningApplication"), "runningApplicationsWithBundleIdentifier:", s,
+                 argtypes=(c_void_p,))
+    n = _send(objc, apps, "count", restype=ctypes.c_ulong)
+    for i in range(n):
+        _send(objc, _send(objc, apps, "objectAtIndex:", i, argtypes=(ctypes.c_ulong,)), "terminate", restype=c_bool)
+    return n > 0
+
+
+def screen_capture_allowed(ask=False):
+    """Screen Recording for the app that started us. ask=True shows macOS's prompt (once ever)."""
+    if sys.platform != "darwin":
+        return False
+    cg = ctypes.cdll.LoadLibrary("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics")
+    fn = cg.CGRequestScreenCaptureAccess if ask else cg.CGPreflightScreenCaptureAccess
+    fn.restype = c_bool
+    return bool(fn())
+
+
+def accessibility_allowed():
+    """Accessibility (used by the e2e harness only to *read* window titles and menu-bar items)."""
+    if sys.platform != "darwin":
+        return False
+    ax = ctypes.cdll.LoadLibrary("/System/Library/Frameworks/ApplicationServices.framework/ApplicationServices")
+    ax.AXIsProcessTrusted.restype = c_bool
+    return bool(ax.AXIsProcessTrusted())

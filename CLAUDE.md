@@ -41,7 +41,9 @@ bitnet_desk/
   server.py      start/stop/health of bitnet.cpp llama-server (subprocess, localhost only)
   llm.py         prompt formatting, streaming /completion client, context fitting
   actions/       (phase 2) tool registry, fast path, model router, permissions, action log, eval
-                 — design in docs/actions-design.md
+                 — design in docs/actions-design.md; system/media tools and routines (phase 3)
+  login.py, shortcuts.py   launch at login (LaunchAgent); the two Do Not Disturb Shortcuts
+  e2e.py         real-Mac end-to-end harness (no synthetic input; restores state) → docs/e2e-report.md
   memory/        (phase 5) local index of user folders: chunking, CPU embeddings, SQLite store
   ui/            Tkinter app (may move to a native wrapper in phase 8)
   app.py         entry point: python -m bitnet_desk
@@ -79,10 +81,22 @@ BitNet/          upstream microsoft/BitNet clone + model weights (git-ignored, b
 python3.12 -m bitnet_desk       # run the app (python3.12 assistant.py also works)
 python3.12 -m venv .venv && .venv/bin/pip install pytest   # one-time test setup
 .venv/bin/python -m pytest -q   # tests (mock server; no model needed)
+python3.12 -m bitnet_desk.e2e   # real-Mac end-to-end checks (needs the model server running)
+python3.12 -m bitnet_desk.e2e --permissions   # which macOS permissions are granted (no prompts)
 BITNET_THREADS=8 python3.12 -m bitnet_desk
 ```
 
 ## How to work in this repo
+- **Test everything end to end yourself; the user only wants to see the finished product.** After unit
+  tests, run the real-Mac harness (`python3.12 -m bitnet_desk.e2e`), fix what fails, and report the
+  results (`docs/e2e-report.md`). Don't hand testing back to the user.
+- **Never send synthetic keystrokes or clicks** to the Mac (System Events `keystroke`/`key code`,
+  CGEventPost, AX presses): the user may be using it. Drive the app by calling its own methods, and
+  read effects through state queries (volume settings, Spotify's player state, window titles).
+- **Say right before a macOS permission prompt (or any dialog needing a click) appears**, so the user
+  can click Allow. `python3.12 -m bitnet_desk.e2e --permissions` shows what's granted without prompting.
+- The harness must restore whatever it changes (volume, Spotify, windows, Do Not Disturb, login item)
+  and must never run lock screen or empty Trash; it only checks their plans.
 - Read `ROADMAP.md` first and work on **one unchecked item at a time**. Propose a short plan before
   large changes; keep commits small and focused.
 - Every behaviour change gets a test. Tests must not need the real model or the network — use the

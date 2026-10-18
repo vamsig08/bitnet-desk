@@ -26,7 +26,8 @@ VOLUME_STEP = 10
 LOGIN_FRAMEWORK = "/System/Library/PrivateFrameworks/login.framework/Versions/Current/login"
 DND_SETUP = ('To switch Do Not Disturb I run two Shortcuts you make once in the Shortcuts app: '
              '“{on}” (one action: Set Focus → Do Not Disturb → Turn On) and “{off}” (Set Focus → '
-             'Turn Off). Make them, then try again.')
+             'Turn Off). `python3.12 -m bitnet_desk --setup-shortcuts` makes them for you — you click '
+             '“Add Shortcut” twice. Then try again.')
 
 
 def _osascript(*lines):
